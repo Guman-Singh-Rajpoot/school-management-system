@@ -61,14 +61,19 @@ In the Render dashboard, add these environment variables:
 - `DEBUG`: `False`
 - `ALLOWED_HOSTS`: `school-management-backend.onrender.com`
 - `CORS_ALLOWED_ORIGINS`: `https://your-frontend-url.onrender.com`
-- `DATABASE_URL`: Will be auto-set by Render when you add PostgreSQL
+- `DATABASE_URL`: Your PostgreSQL connection string from Render
+- `DB_NAME`: Your database name (e.g., `school_management`)
+- `DB_USER`: Your database username
+- `DB_PASSWORD`: Your database password
+- `DB_HOST`: Your database host (Render internal address)
+- `DB_PORT`: `5432`
 
-### 4. Add PostgreSQL Database
-- Click "Create" on the Database section
-- **Name:** school-management-db
-- **Engine:** PostgreSQL
-- **Plan:** Free or Starter
-- **Version:** 15
+### 4. Connect Existing PostgreSQL Database
+Your PostgreSQL database has already been created separately in Render:
+- Get your **Internal Database URL** from your database instance dashboard
+- Copy the full connection string (format: `postgresql://user:password@host:5432/dbname`)
+- Use this as your `DATABASE_URL` environment variable above
+- No need to create a new database through the backend service
 
 ### 5. Frontend Service Setup
 - Add new Web Service (or use Render's Static Site for frontend only)
@@ -99,7 +104,7 @@ In the Render dashboard, add these environment variables:
 1. **CORS Configuration**: Update CORS_ALLOWED_ORIGINS after getting your Render URLs
 2. **Static Files**: WhiteNoise is configured to serve static files efficiently
 3. **Media Files**: Media files are stored in the instance's ephemeral filesystem and will be lost on redeploy. Consider using object storage (S3, Cloudinary) for production.
-4. **Database**: PostgreSQL instance will be created and connected automatically
+4. **Database**: PostgreSQL instance is connected via DATABASE_URL environment variable
 5. **Free Plan Limits**: 
    - Services spin down after 15 minutes of inactivity
    - Limited to 0.5 CPU and 512MB RAM

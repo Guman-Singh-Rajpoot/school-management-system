@@ -48,17 +48,35 @@ In the service settings, add these environment variables:
 | `ALLOWED_HOSTS` | `*.onrender.com,127.0.0.1` |
 | `CORS_ALLOWED_ORIGINS` | `https://<your-frontend-url>` |
 | `PYTHON_VERSION` | `3.11` |
+| `DATABASE_URL` | Your database connection string (add in Step 5) |
+| `DB_NAME` | Your database name |
+| `DB_USER` | Your database username |
+| `DB_PASSWORD` | Your database password |
+| `DB_HOST` | Your database host |
+| `DB_PORT` | `5432` |
 
-## Step 5: Add PostgreSQL Database
+## Step 5: Connect Existing PostgreSQL Database
 
-1. In the backend service dashboard, scroll to "Databases"
-2. Click "Create Database"
-3. Configure:
-   - **Name**: `school-management-db`
-   - **Engine**: PostgreSQL
-   - **Plan**: Free
+Since you've already created a separate database in Render:
 
-Render will automatically set the `DATABASE_URL` environment variable.
+1. From your Render dashboard, go to your PostgreSQL database instance
+2. Copy the **Internal Database URL** (starts with `postgresql://`)
+3. Go back to your backend service settings
+4. Add/Update these environment variables:
+
+| Key | Value |
+|-----|-------|
+| `DATABASE_URL` | Your internal database URL from step 2 |
+| `DB_NAME` | `school_management` (or your actual DB name) |
+| `DB_USER` | Your database username |
+| `DB_PASSWORD` | Your database password |
+| `DB_HOST` | Your database host (internal address) |
+| `DB_PORT` | `5432` |
+
+**Example DATABASE_URL:**
+```
+postgresql://username:password@dpg-xxxx-a.oregon-postgres.render.com:5432/school_management
+```
 
 ## Step 6: Create Frontend Service
 

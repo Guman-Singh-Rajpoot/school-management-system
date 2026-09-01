@@ -26,23 +26,17 @@ services:
         scope: project
         value: https://school-management-frontend.onrender.com,https://*.onrender.com
       - key: DATABASE_URL
-        fromDatabase:
-          name: school-management-db
-          property: connectionString
+        scope: project
+        # Set this to your Render PostgreSQL connection string
+        # Format: postgresql://username:password@hostname:5432/dbname
       - key: DB_NAME
         value: school_management
       - key: DB_USER
-        fromDatabase:
-          name: school-management-db
-          property: user
+        scope: project
       - key: DB_PASSWORD
-        fromDatabase:
-          name: school-management-db
-          property: password
+        scope: project
       - key: DB_HOST
-        fromDatabase:
-          name: school-management-db
-          property: host
+        scope: project
       - key: DB_PORT
         value: "5432"
 
@@ -59,12 +53,3 @@ services:
       - key: VITE_API_URL
         scope: project
         value: https://school-management-backend.onrender.com
-
-databases:
-  # PostgreSQL Database
-  - name: school-management-db
-    engine: postgres
-    plan: free
-    region: oregon
-    version: "15"
-    ipAllowList: []

@@ -45,6 +45,7 @@ services:
     name: school-management-frontend
     plan: free
     region: oregon
+    rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:

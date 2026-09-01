@@ -12,11 +12,23 @@ import axios from "axios";
 |
 | Django:
 |   /api/students/
+|
+| Supports both development (with Vite proxy) and production
+| (with full API URL from environment variable)
 |--------------------------------------------------------------------------
 */
 
+const getBaseURL = () => {
+  // For production, use the VITE_API_URL environment variable
+  if (import.meta.env.PROD && import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // For development, use the relative path (Vite proxy handles this)
+  return "/api";
+};
+
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: getBaseURL(),
   headers: {
     "Content-Type": "application/json",
   },

@@ -150,11 +150,11 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:3000',
-    cast=Csv(),
-)
+CORS_ALLOWED_ORIGINS = [
+    'https://school-management-system-1-ooa9.onrender.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 
 # Security hardening (production should set DEBUG=False and configure these via env)
 SECURE_BROWSER_XSS_FILTER = True

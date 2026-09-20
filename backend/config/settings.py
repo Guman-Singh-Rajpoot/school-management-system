@@ -1,6 +1,7 @@
 """
 Django settings for the Student & Teacher Management System.
 """
+import dj_database_url
 from pathlib import Path
 from datetime import timedelta
 from decouple import config, Csv
@@ -76,14 +77,10 @@ ASGI_APPLICATION = 'config.asgi.application'
 
 # Database
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'school_management',
-        'USER': 'postgres',
-        'PASSWORD': 'guman123',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(
+        default='postgresql://postgres:postgres@localhost:5432/school_management',
+        conn_max_age=600,
+    )
 }
 
 AUTH_USER_MODEL = 'accounts.User'

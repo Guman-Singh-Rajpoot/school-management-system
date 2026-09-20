@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': 'https://school-management-system-8lht.onrender.com',
     },
   },
 })

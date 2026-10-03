@@ -1,12 +1,33 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, Eye, EyeOff, User, Lock } from "lucide-react";
 
 const ROLE_HOME = {
   ADMIN: "/admin",
   TEACHER: "/teacher",
   STUDENT: "/student",
+};
+
+const DEMO_USERS = {
+  STUDENT: {
+    label: "Student",
+    identifier: "teststudent99",
+    password: "Password123!",
+    badgeClass: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800",
+  },
+  TEACHER: {
+    label: "Teacher",
+    identifier: "demoteacher",
+    password: "Password123!",
+    badgeClass: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800",
+  },
+  ADMIN: {
+    label: "Admin",
+    identifier: "demoadmin",
+    password: "Password123!",
+    badgeClass: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800",
+  },
 };
 
 export default function Login() {
@@ -15,7 +36,17 @@ export default function Login() {
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+
+  const handleFillDemo = (roleKey) => {
+    const demo = DEMO_USERS[roleKey];
+    if (demo) {
+      setIdentifier(demo.identifier);
+      setPassword(demo.password);
+      setError("");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,10 +71,6 @@ export default function Login() {
 
       console.log("LOGIN RESULT:", result);
 
-      // -------------------------------------------------------
-      // Check login result
-      // -------------------------------------------------------
-
       if (!result) {
         setError("Login failed. No response received.");
         return;
@@ -53,39 +80,26 @@ export default function Login() {
         setError(
           result.error ||
             result.message ||
-            "Invalid username/email/phone or password."
+            "Invalid username, email, phone or password."
         );
         return;
       }
 
-      // -------------------------------------------------------
       // Get logged-in user
-      // -------------------------------------------------------
-
       let loggedInUser = result.user || null;
 
-      // If AuthContext didn't return user,
-      // try localStorage.
       if (!loggedInUser) {
         const savedUser = localStorage.getItem("user");
-
         if (savedUser) {
           try {
             loggedInUser = JSON.parse(savedUser);
           } catch (parseError) {
-            console.error(
-              "Error parsing saved user:",
-              parseError
-            );
+            console.error("Error parsing saved user:", parseError);
           }
         }
       }
 
       console.log("LOGGED IN USER:", loggedInUser);
-
-      // -------------------------------------------------------
-      // Validate user
-      // -------------------------------------------------------
 
       if (!loggedInUser) {
         setError(
@@ -93,10 +107,6 @@ export default function Login() {
         );
         return;
       }
-
-      // -------------------------------------------------------
-      // Get role
-      // -------------------------------------------------------
 
       const role = String(
         loggedInUser.role ||
@@ -114,10 +124,6 @@ export default function Login() {
         return;
       }
 
-      // -------------------------------------------------------
-      // Find dashboard
-      // -------------------------------------------------------
-
       const destination = ROLE_HOME[role];
 
       if (!destination) {
@@ -127,13 +133,7 @@ export default function Login() {
         return;
       }
 
-      // -------------------------------------------------------
-      // Redirect
-      // -------------------------------------------------------
-
-      console.log(
-        `Login successful. Redirecting ${role} to ${destination}`
-      );
+      console.log(`Login successful. Redirecting ${role} to ${destination}`);
 
       navigate(destination, {
         replace: true,
@@ -141,27 +141,30 @@ export default function Login() {
     } catch (err) {
       console.error("LOGIN ERROR:", err);
 
-      // Django / DRF error handling
       const responseData = err?.response?.data;
-
-      let errorMessage =
-        "Login failed. Please check your credentials.";
+      let errorMessage = "Login failed. Please check your credentials.";
 
       if (responseData) {
         if (typeof responseData === "string") {
           errorMessage = responseData;
         } else if (responseData.detail) {
-          errorMessage = responseData.detail;
+          errorMessage = String(responseData.detail);
         } else if (responseData.message) {
-          errorMessage = responseData.message;
+          errorMessage = String(responseData.message);
         } else if (responseData.error) {
-          errorMessage = responseData.error;
+          errorMessage = String(responseData.error);
         } else if (responseData.non_field_errors) {
-          errorMessage = Array.isArray(
-            responseData.non_field_errors
-          )
+          errorMessage = Array.isArray(responseData.non_field_errors)
             ? responseData.non_field_errors.join(" ")
-            : responseData.non_field_errors;
+            : String(responseData.non_field_errors);
+        } else if (responseData.username) {
+          errorMessage = Array.isArray(responseData.username)
+            ? responseData.username.join(" ")
+            : String(responseData.username);
+        } else if (responseData.password) {
+          errorMessage = Array.isArray(responseData.password)
+            ? responseData.password.join(" ")
+            : String(responseData.password);
         }
       }
 
@@ -171,16 +174,10 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4">
-
-      <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-800">
-
-        {/* =====================================================
-            LOGO
-        ====================================================== */}
-
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-800">
+        {/* LOGO */}
         <div className="flex flex-col items-center mb-6">
-
-          <div className="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white mb-3">
+          <div className="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white mb-3 shadow-md shadow-brand-500/20">
             <GraduationCap size={26} />
           </div>
 
@@ -191,22 +188,12 @@ export default function Login() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Sign in to your account
           </p>
-
         </div>
 
-        {/* =====================================================
-            LOGIN FORM
-        ====================================================== */}
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
-
+        {/* LOGIN FORM */}
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Identifier */}
-
           <div>
-
             <label
               htmlFor="identifier"
               className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300"
@@ -214,26 +201,28 @@ export default function Login() {
               Username / Email / Phone
             </label>
 
-            <input
-              id="identifier"
-              type="text"
-              value={identifier}
-              onChange={(e) => {
-                setIdentifier(e.target.value);
-                setError("");
-              }}
-              autoComplete="username"
-              placeholder="Enter username, email or phone"
-              disabled={loading}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
-            />
-
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <User size={16} />
+              </span>
+              <input
+                id="identifier"
+                type="text"
+                value={identifier}
+                onChange={(e) => {
+                  setIdentifier(e.target.value);
+                  setError("");
+                }}
+                autoComplete="username"
+                placeholder="Enter username, email or phone"
+                disabled={loading}
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
+              />
+            </div>
           </div>
 
           {/* Password */}
-
           <div>
-
             <label
               htmlFor="password"
               className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300"
@@ -241,105 +230,97 @@ export default function Login() {
               Password
             </label>
 
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError("");
-              }}
-              autoComplete="current-password"
-              placeholder="••••••••"
-              disabled={loading}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
-            />
-
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <Lock size={16} />
+              </span>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError("");
+                }}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                disabled={loading}
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-10 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
           {/* Forgot password */}
-
           <div className="flex justify-end">
-
             <Link
               to="/forgot-password"
               className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
             >
               Forgot password?
             </Link>
-
           </div>
 
           {/* Error */}
-
           {error && (
             <div
               role="alert"
-              className="text-sm text-red-600 bg-red-50 dark:bg-red-950/40 dark:text-red-400 rounded-lg px-3 py-2"
+              className="text-sm text-red-600 bg-red-50 dark:bg-red-950/40 dark:text-red-400 rounded-lg px-3 py-2 border border-red-200 dark:border-red-900/50"
             >
               {error}
             </div>
           )}
 
           {/* Login button */}
-
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium rounded-lg py-2.5 text-sm transition-colors"
+            className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium rounded-lg py-2.5 text-sm transition-colors shadow-sm"
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
-
         </form>
 
-        {/* =====================================================
-            REGISTER
-        ====================================================== */}
-
-        <div className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
-
+        {/* REGISTER */}
+        <div className="mt-5 text-center text-sm text-slate-600 dark:text-slate-400">
           Don't have an account?{" "}
-
           <Link
             to="/register"
             className="font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400"
           >
             Register
           </Link>
-
         </div>
 
-        {/* =====================================================
-            ACCOUNT TYPES
-        ====================================================== */}
-
+        {/* QUICK DEMO ACCOUNTS */}
         <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800">
-
-          <p className="text-xs text-center text-slate-500 dark:text-slate-400 mb-3">
-            Available account types
+          <p className="text-xs text-center font-medium text-slate-500 dark:text-slate-400 mb-2.5">
+            Quick demo login (click to auto-fill)
           </p>
 
-          <div className="flex justify-center gap-2 text-xs">
-
-            <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">
-              Student
-            </span>
-
-            <span className="px-3 py-1 rounded-full bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400">
-              Teacher
-            </span>
-
-            <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400">
-              Admin
-            </span>
-
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(DEMO_USERS).map(([key, demo]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => handleFillDemo(key)}
+                className={`py-1.5 px-2 rounded-lg text-xs font-medium border text-center transition-colors ${demo.badgeClass}`}
+                title={`Login as ${demo.label} (${demo.identifier})`}
+              >
+                {demo.label}
+              </button>
+            ))}
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 }

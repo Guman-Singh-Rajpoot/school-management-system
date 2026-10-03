@@ -140,6 +140,7 @@ class Student(models.Model):
         'academics.Session',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         related_name='students'
     )
 
@@ -147,6 +148,7 @@ class Student(models.Model):
         'academics.SchoolClass',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         related_name='students'
     )
 

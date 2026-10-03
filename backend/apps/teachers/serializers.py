@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import serializers
 from apps.accounts.serializers import UserSerializer
 from apps.accounts.models import User
@@ -113,6 +114,7 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True, min_length=8)
+    experience_years = serializers.IntegerField(required=False, default=0)
 
     class Meta:
         model = Teacher
@@ -125,21 +127,53 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
             'bank_name', 'salary', 'joining_date', 'address',
         ]
 
+    def validate_username(self, value):
+        val = value.strip()
+        if User.objects.filter(username__iexact=val).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return val
+
+    def validate_email(self, value):
+        val = value.strip().lower()
+        if User.objects.filter(email__iexact=val).exists():
+            raise serializers.ValidationError("A user with this email address already exists.")
+        return val
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'experience_years' in data and (data['experience_years'] == '' or data['experience_years'] is None):
+            data['experience_years'] = 0
+        if 'salary' in data and (data['salary'] == '' or data['salary'] is None):
+            data['salary'] = None
+        return super().to_internal_value(data)
+
+    @transaction.atomic
     def create(self, validated_data):
         subjects = validated_data.pop('subjects', [])
         classes = validated_data.pop('classes', [])
+        username = validated_data.pop('username').strip()
+        email = validated_data.pop('email').strip().lower()
+        first_name = validated_data.pop('first_name').strip()
+        last_name = validated_data.pop('last_name').strip()
+        password = validated_data.pop('password')
+
         user = User.objects.create_user(
-            username=validated_data.pop('username'),
-            email=validated_data.pop('email'),
-            first_name=validated_data.pop('first_name'),
-            last_name=validated_data.pop('last_name'),
-            password=validated_data.pop('password'),
+            username=username,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            password=password,
             role=User.Role.TEACHER,
         )
         teacher = Teacher.objects.create(user=user, **validated_data)
-        teacher.subjects.set(subjects)
-        teacher.classes.set(classes)
+        if subjects:
+            teacher.subjects.set(subjects)
+        if classes:
+            teacher.classes.set(classes)
         return teacher
+
+    def to_representation(self, instance):
+        return TeacherSerializer(instance, context=self.context).data
 
 
 class TeacherAttendanceSerializer(serializers.ModelSerializer):

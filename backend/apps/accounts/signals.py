@@ -12,5 +12,5 @@ def sync_superuser_role(sender, instance, **kwargs):
     (add/edit/delete students & teachers, documents, etc.) through
     the API and the React app -- not just the /admin/ site.
     """
-    if instance.is_superuser and instance.role != User.Role.ADMIN:
+    if (instance.is_superuser or instance.is_staff) and instance.role != User.Role.ADMIN:
         instance.role = User.Role.ADMIN

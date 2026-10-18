@@ -1,3 +1,4 @@
+
 import uuid
 
 from django.db import models
@@ -130,7 +131,7 @@ class Payment(models.Model):
         BANK_TRANSFER = 'BANK_TRANSFER', 'Bank Transfer'
         CHEQUE = 'CHEQUE', 'Cheque'
 
-    receipt_number = models.CharField(max_length=30, unique=True, default=uuid.uuid4)
+    receipt_number = models.CharField(max_length=36, unique=True, default=uuid.uuid4)
 
     student_fee = models.ForeignKey(
         StudentFee,

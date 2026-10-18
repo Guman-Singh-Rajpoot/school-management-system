@@ -18,6 +18,15 @@ class User(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def is_admin(self):
+        return self.role == self.Role.ADMIN or self.is_superuser or self.is_staff
+
+    def save(self, *args, **kwargs):
+        if (self.is_superuser or self.is_staff) and self.role != self.Role.ADMIN:
+            self.role = self.Role.ADMIN
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.username} ({self.role})"
 

@@ -42,11 +42,15 @@ function normalizeUser(user) {
     return null;
   }
 
+  const rawRole =
+    user.role ||
+    user.user_role ||
+    user.type ||
+    (user.is_superuser || user.is_staff ? "ADMIN" : null);
+
   return {
     ...user,
-    role: user.role
-      ? String(user.role).toUpperCase()
-      : null,
+    role: rawRole ? String(rawRole).toUpperCase() : null,
   };
 }
 
@@ -399,31 +403,37 @@ export function AuthProvider({ children }) {
         serverData &&
         typeof serverData === "object"
       ) {
-
-        const messages = [];
-
-        Object.entries(serverData).forEach(
-          ([field, value]) => {
-
-            if (Array.isArray(value)) {
-
-              messages.push(
-                `${field}: ${value.join(", ")}`
-              );
-
-            } else {
-
-              messages.push(
-                `${field}: ${value}`
-              );
-            }
+        if (serverData.detail) {
+          errorMessage = String(serverData.detail);
+        } else if (serverData.message) {
+          errorMessage = String(serverData.message);
+        } else if (serverData.error) {
+          errorMessage = String(serverData.error);
+        } else if (serverData.non_field_errors) {
+          errorMessage = Array.isArray(serverData.non_field_errors)
+            ? serverData.non_field_errors.join(" ")
+            : String(serverData.non_field_errors);
+        } else if (serverData.username) {
+          errorMessage = Array.isArray(serverData.username)
+            ? serverData.username.join(" ")
+            : String(serverData.username);
+        } else if (serverData.password) {
+          errorMessage = Array.isArray(serverData.password)
+            ? serverData.password.join(" ")
+            : String(serverData.password);
+        } else {
+          const messages = [];
+          Object.entries(serverData).forEach(([field, value]) => {
+            const text = Array.isArray(value)
+              ? value.join(", ")
+              : typeof value === "object"
+              ? JSON.stringify(value)
+              : String(value);
+            messages.push(`${field}: ${text}`);
+          });
+          if (messages.length > 0) {
+            errorMessage = messages.join(" | ");
           }
-        );
-
-        if (messages.length > 0) {
-
-          errorMessage =
-            messages.join(" | ");
         }
       }
 

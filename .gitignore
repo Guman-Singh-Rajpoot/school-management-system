@@ -1,0 +1,115 @@
+# =========================
+
+# Python
+
+# =========================
+
+**pycache**/
+*.py[cod]
+*.pyo
+*.pyd
+
+# =========================
+
+# Django
+
+# =========================
+
+*.log
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# =========================
+
+# Django migrations
+
+# =========================
+
+# Migration files are intentionally tracked.
+
+# Do NOT add migrations/ to .gitignore.
+
+# =========================
+
+# Environment Variables
+
+# =========================
+
+.env
+.env.*
+*.env
+!.env.example
+
+# =========================
+
+# Virtual Environment
+
+# =========================
+
+venv/
+.venv/
+env/
+ENV/
+
+# =========================
+
+# Node / React / Vite
+
+# =========================
+
+node_modules/
+dist/
+build/
+.vite/
+
+# =========================
+
+# IDE / Editor
+
+# =========================
+
+.vscode/
+.idea/
+
+# =========================
+
+# OS
+
+# =========================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+
+# Python Tools
+
+# =========================
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+
+# Coverage
+
+# =========================
+
+.coverage
+htmlcov/
+coverage.xml
+
+# =========================
+
+# Temporary Files
+
+# =========================
+
+*.tmp
+*.temp
+*.swp
+*.swo

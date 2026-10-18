@@ -52,6 +52,17 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             raise_exception=True
         )
 
+        user = getattr(serializer, 'user', None)
+        if user:
+            try:
+                AuditLog.objects.create(
+                    user=user,
+                    action="LOGIN",
+                    details={"role": getattr(user, 'role', '')}
+                )
+            except Exception:
+                pass
+
         return Response(
             serializer.validated_data,
             status=status.HTTP_200_OK

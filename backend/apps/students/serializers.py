@@ -1,7 +1,9 @@
+from django.db import transaction
 from rest_framework import serializers
 
 from apps.accounts.serializers import UserSerializer
 from apps.accounts.models import User
+from apps.academics.models import Session, SchoolClass, Section
 
 from .models import Student, StudentDocument
 
@@ -77,6 +79,24 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         min_length=8
     )
 
+    session = serializers.PrimaryKeyRelatedField(
+        queryset=Session.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    school_class = serializers.PrimaryKeyRelatedField(
+        queryset=SchoolClass.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    section = serializers.PrimaryKeyRelatedField(
+        queryset=Section.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = Student
 
@@ -86,14 +106,39 @@ class StudentCreateSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def validate_username(self, value):
+        val = value.strip()
+        if User.objects.filter(username__iexact=val).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return val
+
+    def validate_email(self, value):
+        val = value.strip().lower()
+        if User.objects.filter(email__iexact=val).exists():
+            raise serializers.ValidationError("A user with this email address already exists.")
+        return val
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        for key in ('session', 'school_class', 'section'):
+            if key in data and (data[key] == '' or data[key] is None):
+                data[key] = None
+        return super().to_internal_value(data)
+
+    @transaction.atomic
     def create(self, validated_data):
+        username = validated_data.pop("username").strip()
+        email = validated_data.pop("email").strip().lower()
+        first_name = validated_data.pop("first_name").strip()
+        last_name = validated_data.pop("last_name").strip()
+        password = validated_data.pop("password")
 
         user = User.objects.create_user(
-            username=validated_data.pop("username"),
-            email=validated_data.pop("email"),
-            first_name=validated_data.pop("first_name"),
-            last_name=validated_data.pop("last_name"),
-            password=validated_data.pop("password"),
+            username=username,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            password=password,
             role=User.Role.STUDENT,
         )
 
@@ -101,3 +146,6 @@ class StudentCreateSerializer(serializers.ModelSerializer):
             user=user,
             **validated_data
         )
+
+    def to_representation(self, instance):
+        return StudentSerializer(instance, context=self.context).data

@@ -5,30 +5,12 @@ import { GraduationCap, Eye, EyeOff, User, Lock } from "lucide-react";
 
 const ROLE_HOME = {
   ADMIN: "/admin",
+  OWNER: "/admin",
   TEACHER: "/teacher",
   STUDENT: "/student",
 };
 
-const DEMO_USERS = {
-  STUDENT: {
-    label: "Student",
-    identifier: "teststudent99",
-    password: "Password123!",
-    badgeClass: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800",
-  },
-  TEACHER: {
-    label: "Teacher",
-    identifier: "demoteacher",
-    password: "Password123!",
-    badgeClass: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800",
-  },
-  ADMIN: {
-    label: "Admin",
-    identifier: "demoadmin",
-    password: "Password123!",
-    badgeClass: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800",
-  },
-};
+
 
 export default function Login() {
   const { login, loading } = useAuth();
@@ -39,14 +21,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  const handleFillDemo = (roleKey) => {
-    const demo = DEMO_USERS[roleKey];
-    if (demo) {
-      setIdentifier(demo.identifier);
-      setPassword(demo.password);
-      setError("");
-    }
-  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -135,9 +110,12 @@ export default function Login() {
 
       console.log(`Login successful. Redirecting ${role} to ${destination}`);
 
-      navigate(destination, {
-        replace: true,
-      });
+      // If the account was created with a temporary password, force change first.
+      if (loggedInUser?.must_change_password) {
+        navigate('/change-password', { replace: true });
+      } else {
+        navigate(destination, { replace: true });
+      }
     } catch (err) {
       console.error("LOGIN ERROR:", err);
 
@@ -289,37 +267,18 @@ export default function Login() {
           </button>
         </form>
 
-        {/* REGISTER */}
-        <div className="mt-5 text-center text-sm text-slate-600 dark:text-slate-400">
-          Don't have an account?{" "}
-          <Link
-            to="/register"
-            className="font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400"
-          >
-            Register
+        {/* ADMINISTRATIVE NOTICE */}
+        <div className="mt-5 text-center text-xs text-slate-500 dark:text-slate-400">
+          Account credentials are created and managed by the school administrator.
+        </div>
+
+        <div className="mt-5 text-center">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">New School? Register Your School</p>
+          <Link to="/owner-register" className="inline-block bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg px-4 py-2 transition-colors">
+            Admin Sign Up / Register Your School
           </Link>
         </div>
 
-        {/* QUICK DEMO ACCOUNTS */}
-        <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800">
-          <p className="text-xs text-center font-medium text-slate-500 dark:text-slate-400 mb-2.5">
-            Quick demo login (click to auto-fill)
-          </p>
-
-          <div className="grid grid-cols-3 gap-2">
-            {Object.entries(DEMO_USERS).map(([key, demo]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => handleFillDemo(key)}
-                className={`py-1.5 px-2 rounded-lg text-xs font-medium border text-center transition-colors ${demo.badgeClass}`}
-                title={`Login as ${demo.label} (${demo.identifier})`}
-              >
-                {demo.label}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

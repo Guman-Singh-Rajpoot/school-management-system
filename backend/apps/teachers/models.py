@@ -18,6 +18,7 @@ class Teacher(models.Model):
     department = models.CharField(max_length=100)
     subjects = models.ManyToManyField('academics.Subject', related_name='teachers', blank=True)
     classes = models.ManyToManyField('academics.SchoolClass', related_name='teachers', blank=True)
+    sections = models.ManyToManyField('academics.Section', related_name='teachers', blank=True)
 
     aadhaar_number = models.CharField(max_length=12, blank=True)
     pan_number = models.CharField(max_length=10, blank=True)

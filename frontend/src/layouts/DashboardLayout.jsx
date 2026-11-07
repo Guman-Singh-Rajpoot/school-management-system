@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard, Users, GraduationCap, CalendarCheck, BookOpen,
-  Wallet, Megaphone, Moon, Sun, LogOut, Menu, X,
+  Wallet, Megaphone, Moon, Sun, LogOut, Menu, X, MessageSquare,
+  Calendar, Briefcase, UserCheck, History,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -17,7 +18,38 @@ const NAV_BY_ROLE = {
     { to: '/admin/fees', label: 'Fees', icon: Wallet },
     { to: '/admin/salaries', label: 'Teacher Salary', icon: Wallet },
     { to: '/admin/classes', label: 'Classes & Sessions', icon: BookOpen },
+    { to: '/admin/examinations', label: 'Examinations', icon: Calendar },
+    { to: '/admin/marks', label: 'Marks', icon: BookOpen },
+    { to: '/admin/report-cards', label: 'Report Cards', icon: GraduationCap },
+    { to: '/admin/documents', label: 'Documents', icon: FolderOpen },
+    { to: '/admin/homework', label: 'Homework', icon: Briefcase },
+    { to: '/admin/timetable', label: 'Timetable', icon: Layout },
+    { to: '/admin/fee-structures', label: 'Fee Structures', icon: Wallet },
+    { to: '/admin/fee-payments', label: 'Fee Payments', icon: History },
+    { to: '/admin/teacher-salaries', label: 'Teacher Salaries', icon: UserCheck },
     { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+    { to: '/admin/whatsapp', label: 'WhatsApp & Alerts', icon: MessageSquare },
+  ],
+  OWNER: [
+    { to: '/admin', label: 'School Dashboard', icon: LayoutDashboard, end: true },
+    { to: '/admin/students', label: 'Students', icon: GraduationCap },
+    { to: '/admin/teachers', label: 'Teachers', icon: Users },
+    { to: '/admin/attendance', label: 'Student Attendance', icon: CalendarCheck },
+    { to: '/admin/teacher-attendance', label: 'Teacher Attendance', icon: CalendarCheck },
+    { to: '/admin/fees', label: 'Fees', icon: Wallet },
+    { to: '/admin/salaries', label: 'Teacher Salary', icon: Wallet },
+    { to: '/admin/classes', label: 'Classes & Sessions', icon: BookOpen },
+    { to: '/admin/examinations', label: 'Examinations', icon: Calendar },
+    { to: '/admin/marks', label: 'Marks', icon: BookOpen },
+    { to: '/admin/report-cards', label: 'Report Cards', icon: GraduationCap },
+    { to: '/admin/documents', label: 'Documents', icon: FolderOpen },
+    { to: '/admin/homework', label: 'Homework', icon: Briefcase },
+    { to: '/admin/timetable', label: 'Timetable', icon: Layout },
+    { to: '/admin/fee-structures', label: 'Fee Structures', icon: Wallet },
+    { to: '/admin/fee-payments', label: 'Fee Payments', icon: History },
+    { to: '/admin/teacher-salaries', label: 'Teacher Salaries', icon: UserCheck },
+    { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+    { to: '/admin/whatsapp', label: 'WhatsApp & Alerts', icon: MessageSquare },
   ],
   TEACHER: [
     { to: '/teacher', label: 'Dashboard', icon: LayoutDashboard, end: true },

@@ -3,14 +3,13 @@ import { Link } from "react-router-dom";
 import api from "../api/client";
 import StatCard from "../components/StatCard";
 import Card from "../components/Card";
-import {
-  Users,
-  GraduationCap,
-  CalendarCheck,
-  Wallet
-} from "lucide-react";
+import { Users, GraduationCap, CalendarCheck, Wallet, Calendar, BookOpen, Megaphone, MessageSquare } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export default function AdminDashboard() {
+  const { user, role } = useAuth();
+  const isAdminOrOwner = ["ADMIN", "OWNER"].includes(String(role || "").toUpperCase());
+
   const [stats, setStats] = useState({
     students: 0,
     teachers: 0,
@@ -20,6 +19,12 @@ export default function AdminDashboard() {
 
   const [todayAttendance, setTodayAttendance] = useState(null);
 
+  const [salaryStats, setSalaryStats] = useState({
+    totalDue: 0,
+    totalPaid: 0,
+  });
+
+  const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,51 +32,73 @@ export default function AdminDashboard() {
       try {
         const today = new Date().toISOString().slice(0, 10);
         const results = await Promise.allSettled([
-          api.get('/students/?page_size=1'),
-          api.get('/teachers/?page_size=1'),
-          api.get('/fees/student-fees/dashboard_summary/'),
-          api.get('/attendance/summary/', { params: { date: today } }),
+          api.get("/students/?page_size=1"),
+          api.get("/teachers/?page_size=1"),
+          api.get("/fees/student-fees/dashboard_summary/"),
+          api.get("/attendance/summary/", { params: { date: today } }),
+          api.get("/teachers/salaries/"),
+          api.get("/api/exams/"),
         ]);
 
         const studentsRes = results[0];
         const teachersRes = results[1];
         const feesRes = results[2];
         const attendanceRes = results[3];
+        const salariesRes = results[4];
+        const examsRes = results[5];
 
         setStats({
           students:
-            studentsRes.status === 'fulfilled'
+            studentsRes.status === "fulfilled"
               ? studentsRes.value?.data?.count ?? 0
               : 0,
 
           teachers:
-            teachersRes.status === 'fulfilled'
+            teachersRes.status === "fulfilled"
               ? teachersRes.value?.data?.count ?? 0
               : 0,
 
           feeCollection:
-            feesRes.status === 'fulfilled'
+            feesRes.status === "fulfilled"
               ? Number(feesRes.value?.data?.total_fee_collection ?? 0)
               : 0,
 
           pendingFees:
-            feesRes.status === 'fulfilled'
+            feesRes.status === "fulfilled"
               ? Number(feesRes.value?.data?.total_pending ?? 0)
               : 0,
         });
 
-        if (attendanceRes.status === 'fulfilled') {
+        if (attendanceRes.status === "fulfilled") {
           setTodayAttendance(attendanceRes.value.data);
         }
+
+        if (salariesRes.status === "fulfilled") {
+          const list = salariesRes.value.data?.results || (Array.isArray(salariesRes.value.data) ? salariesRes.value.data : []);
+          let due = 0;
+          let paid = 0;
+          list.forEach((s) => {
+            due += Number(s.amount || 0);
+            paid += Number(s.paid_amount || 0);
+          });
+          setSalaryStats({ totalDue: due, totalPaid: paid });
+        }
+
+        if (examsRes.status === "fulfilled") {
+          const data = Array.isArray(examsRes.data)
+            ? examsRes.data
+            : examsRes.data?.results || [];
+          setExams(data);
+        }
       } catch (error) {
-        console.error('Dashboard error:', error);
+        console.error("Dashboard error:", error);
       } finally {
         setLoading(false);
       }
     }
 
     loadDashboard();
-  }, []);
+  }, [user, role]);
 
   return (
     <div className="space-y-6">
@@ -79,11 +106,10 @@ export default function AdminDashboard() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold">
-          Admin Dashboard
+          {isAdminOrOwner ? "School Dashboard" : "Dashboard"}
         </h1>
-
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          Overview of the entire school system.
+          Role: {String(role || "").toUpperCase()}
         </p>
       </div>
 
@@ -92,14 +118,14 @@ export default function AdminDashboard() {
 
         <StatCard
           label="Total Students"
-          value={loading ? '…' : stats.students}
+          value={loading ? 'Loading...' : stats.students}
           icon={GraduationCap}
           accent="brand"
         />
 
         <StatCard
           label="Total Teachers"
-          value={loading ? '…' : stats.teachers}
+          value={loading ? 'Loading...' : stats.teachers}
           icon={Users}
           accent="green"
         />
@@ -108,8 +134,8 @@ export default function AdminDashboard() {
           label="Fee Collected"
           value={
             loading
-              ? '…'
-              : `₹${stats.feeCollection.toLocaleString('en-IN')}`
+              ? 'Loading...'
+              : `₹${stats.feeCollection.toLocaleString()}`
           }
           icon={Wallet}
           accent="amber"
@@ -119,8 +145,8 @@ export default function AdminDashboard() {
           label="Fee Pending"
           value={
             loading
-              ? '…'
-              : `₹${stats.pendingFees.toLocaleString('en-IN')}`
+              ? 'Loading...'
+              : `₹${stats.pendingFees.toLocaleString()}`
           }
           icon={CalendarCheck}
           accent="rose"
@@ -128,7 +154,7 @@ export default function AdminDashboard() {
 
       </div>
 
-      {/* Attendance */}
+      {/* Today's Attendance */}
       <Card title="Today's Attendance">
         {todayAttendance && todayAttendance.total_days > 0 ? (
           <div className="grid grid-cols-3 gap-4 text-center">
@@ -188,24 +214,66 @@ export default function AdminDashboard() {
           </Link>
 
           <Link
-            to="/admin/attendance"
+            to "/admin/examinations"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
-            Student Attendance
+            Examinations
           </Link>
 
           <Link
-            to="/admin/teacher-attendance"
+            to "/admin/marks"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
-            Teacher Attendance
+            Marks
           </Link>
 
           <Link
-            to="/admin/classes"
+            to="/admin/report-cards"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
-            Classes & Sessions
+            Report Cards
+          </Link>
+
+          <Link
+            to "/admin/documents"
+            className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          >
+            Documents
+          </Link>
+
+          <Link
+            to "/admin/homework"
+            className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          >
+            Homework
+          </Link>
+
+          <Link
+            to "/admin/timetable"
+            className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          >
+            Timetable
+          </Link>
+
+          <Link
+            to="/admin/fee-structures"
+            className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          >
+            Fee Structures
+          </Link>
+
+          <Link
+            to="/admin/fee-payments"
+            className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          >
+            Fee Payments
+          </Link>
+
+          <Link
+            to="/admin/teacher-salaries"
+            className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 font-medium"
+          >
+            Teacher Salaries
           </Link>
 
           <Link
@@ -213,6 +281,13 @@ export default function AdminDashboard() {
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
             Post Announcement
+          </Link>
+
+          <Link
+            to "/admin/whatsapp"
+            className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 font-medium"
+          >
+            WhatsApp & Alerts
           </Link>
 
         </div>

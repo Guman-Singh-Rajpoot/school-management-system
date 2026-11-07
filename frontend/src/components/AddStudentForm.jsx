@@ -5,7 +5,8 @@ const initial = {
   username: '', email: '', first_name: '', last_name: '', password: '',
   admission_number: '', roll_number: '', gender: 'M', date_of_birth: '',
   admission_date: '', session: '', school_class: '', section: '',
-  mobile_number: '', father_name: '', mother_name: '',
+  mobile_number: '', whatsapp_number: '', must_change_password: true,
+  father_name: '', mother_name: '',
 };
 
 export default function AddStudentForm({ onCreated, onCancel }) {
@@ -78,8 +79,19 @@ export default function AddStudentForm({ onCreated, onCancel }) {
           <input required className={input} value={form.last_name} onChange={(e) => update('last_name', e.target.value)} />
         </div>
         <div className="col-span-2">
-          <label className={label}>Password *</label>
+          <label className={label}>Password * (Temporary / Initial)</label>
           <input required minLength={8} type="password" className={input} value={form.password} onChange={(e) => update('password', e.target.value)} />
+          <label className="flex items-center gap-2 mt-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.must_change_password}
+              onChange={(e) => update('must_change_password', e.target.checked)}
+              className="rounded text-brand-600 focus:ring-brand-500 w-4 h-4"
+            />
+            <span className="text-xs text-slate-600 dark:text-slate-300">
+              Force password change on student's first login
+            </span>
+          </label>
         </div>
       </div>
 
@@ -112,7 +124,11 @@ export default function AddStudentForm({ onCreated, onCancel }) {
         </div>
         <div>
           <label className={label}>Mobile number</label>
-          <input className={input} value={form.mobile_number} onChange={(e) => update('mobile_number', e.target.value)} />
+          <input className={input} value={form.mobile_number} onChange={(e) => update('mobile_number', e.target.value)} placeholder="e.g. 9876543210" />
+        </div>
+        <div className="col-span-2">
+          <label className={label}>WhatsApp number (for login credentials & school alerts)</label>
+          <input className={input} value={form.whatsapp_number} onChange={(e) => update('whatsapp_number', e.target.value)} placeholder="e.g. +919876543210 (defaults to mobile number if empty)" />
         </div>
         <div>
           <label className={label}>Session</label>

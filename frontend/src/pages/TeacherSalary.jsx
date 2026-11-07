@@ -29,7 +29,7 @@ function formatDateTime(value) {
 
 export default function TeacherSalary() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "OWNER";
 
   const [salaries, setSalaries] = useState([]);
   const [loading, setLoading] = useState(true);

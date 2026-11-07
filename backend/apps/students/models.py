@@ -181,6 +181,13 @@ class Student(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['school_class', 'section', 'roll_number'],
+                condition=~models.Q(roll_number=''),
+                name='unique_roll_per_class_section',
+            )
+        ]
 
     def __str__(self):
         return (

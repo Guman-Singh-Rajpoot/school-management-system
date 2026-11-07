@@ -6,13 +6,14 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 # ============================================================
 
 class IsAdmin(BasePermission):
-    """Only authenticated Admin users."""
+    """Only authenticated Admin or School Owner users."""
 
     def has_permission(self, request, view):
+        user = request.user
         return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.role == 'ADMIN'
+            user
+            and user.is_authenticated
+            and (user.role in ('ADMIN', 'OWNER') or user.is_staff or user.is_superuser)
         )
 
 
@@ -51,13 +52,13 @@ class IsStudent(BasePermission):
 # ============================================================
 
 class IsAdminOrTeacher(BasePermission):
-    """Allows authenticated Admin or Teacher users."""
+    """Allows authenticated Admin, School Owner, or Teacher users."""
 
     def has_permission(self, request, view):
         return bool(
             request.user
             and request.user.is_authenticated
-            and request.user.role in ('ADMIN', 'TEACHER')
+            and request.user.role in ('ADMIN', 'OWNER', 'TEACHER')
         )
 
 
@@ -66,29 +67,6 @@ class IsAdminOrTeacher(BasePermission):
 # ============================================================
 
 class IsAdminOrReadOnly(BasePermission):
-    """
-    ADMIN:
-        GET       allowed
-        POST      allowed
-        PUT       allowed
-        PATCH     allowed
-        DELETE    allowed
-
-    TEACHER:
-        GET       allowed
-        POST      denied
-        PUT       denied
-        PATCH     denied
-        DELETE    denied
-
-    STUDENT:
-        GET       allowed
-        POST      denied
-        PUT       denied
-        PATCH     denied
-        DELETE    denied
-    """
-
     def has_permission(self, request, view):
         user = request.user
 
@@ -98,7 +76,7 @@ class IsAdminOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
 
-        return user.role == 'ADMIN'
+        return user.role in ('ADMIN', 'OWNER') or user.is_staff or user.is_superuser
 
 
 # ============================================================
@@ -106,27 +84,14 @@ class IsAdminOrReadOnly(BasePermission):
 # ============================================================
 
 class IsAdminOrSelfStudent(BasePermission):
-    """
-    Student record permission.
-
-    ADMIN:
-        Full CRUD access to every student.
-
-    TEACHER:
-        Read-only access to all students.
-
-    STUDENT:
-        Read-only access to their own student record.
-    """
-
     def has_permission(self, request, view):
         user = request.user
 
         if not user or not user.is_authenticated:
             return False
 
-        # Admin can perform all operations.
-        if user.role == 'ADMIN':
+        # Admin / Owner can perform all operations.
+        if user.role in ('ADMIN', 'OWNER') or user.is_staff or user.is_superuser:
             return True
 
         # Teacher can only read.
@@ -142,13 +107,22 @@ class IsAdminOrSelfStudent(BasePermission):
     def has_object_permission(self, request, view, obj):
         user = request.user
 
-        # Admin can access every student.
-        if user.role == 'ADMIN':
+        # Admin / Owner can access students of their school.
+        if user.role in ('ADMIN', 'OWNER') or user.is_staff or user.is_superuser:
+            if user.school_id and hasattr(obj, 'school_id') and obj.school_id:
+                return obj.school_id == user.school_id
             return True
 
-        # Teacher can read every student.
+        # Teacher can read only students belonging to assigned classes/sections.
         if user.role == 'TEACHER':
-            return request.method in SAFE_METHODS
+            if request.method not in SAFE_METHODS:
+                return False
+            teacher = getattr(user, 'teacher_profile', None)
+            if not teacher:
+                return False
+            is_class_assigned = bool(obj.school_class_id and teacher.classes.filter(id=obj.school_class_id).exists())
+            is_section_assigned = bool(obj.section_id and teacher.sections.filter(id=obj.section_id).exists())
+            return is_class_assigned or is_section_assigned
 
         # Student can read only their own record.
         if user.role == 'STUDENT':
@@ -158,6 +132,27 @@ class IsAdminOrSelfStudent(BasePermission):
             )
 
         return False
+
+
+
+# ============================================================
+# SCHOOL ADMIN HELPER
+# ============================================================
+
+def is_school_admin(user):
+    """Reusable check: True for ADMIN, OWNER, staff, or superuser."""
+    return bool(
+        user
+        and user.is_authenticated
+        and (user.role in ('ADMIN', 'OWNER') or user.is_staff or user.is_superuser)
+    )
+
+
+class IsSchoolAdmin(BasePermission):
+    """Only authenticated Admin or School Owner users."""
+    
+    def has_permission(self, request, view):
+        return is_school_admin(request.user)
 
 
 # ============================================================
@@ -201,8 +196,8 @@ class IsAdminOrOwnerOfObject(BasePermission):
     def has_object_permission(self, request, view, obj):
         user = request.user
 
-        # Admin can access everything.
-        if user.role == 'ADMIN':
+        # Admin / Owner can access everything in their school.
+        if user.role in ('ADMIN', 'OWNER') or user.is_staff or user.is_superuser:
             return True
 
         # Check allowed role.
@@ -341,8 +336,8 @@ class IsSelfStudentOrTeacherViaStudentFK(BasePermission):
     def has_object_permission(self, request, view, obj):
         user = request.user
 
-        # Admin can access everything.
-        if user.role == 'ADMIN':
+        # Admin / Owner can access everything.
+        if user.role in ('ADMIN', 'OWNER') or user.is_staff or user.is_superuser:
             return True
 
         # Teacher can access student-related records.

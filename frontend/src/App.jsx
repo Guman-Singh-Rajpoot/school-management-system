@@ -18,10 +18,33 @@ import DashboardLayout from "./layouts/DashboardLayout";
 // ============================================================
 
 import Login from "./pages/Login";
-import Register from "./pages/Register";
+import OwnerRegister from "./pages/OwnerRegister";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import ChangePassword from "./pages/ChangePassword";
 import AdminDashboard from "./pages/AdminDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
+
+// Examination pages
+import ExaminationsList from "./pages/ExaminationsList";
+import ExamCreate from "./pages/ExamCreate";
+import ExamDetail from "./pages/ExamDetail";
+
+// Marks pages
+import MarksList from "./pages/MarksList";
+import MarkCreate from "./pages/MarkCreate";
+import ReportCard from "./pages/ReportCard";
+
+// Document pages
+import DocumentsList from "./pages/DocumentsList";
+
+// Homework pages
+import HomeworkList from "./pages/HomeworkList";
+import HomeworkCreate from "./pages/HomeworkCreate";
+
+// Timetable pages
+import TimetableList from "./pages/TimetableList";
 
 // ============================================================
 // STUDENT PAGES
@@ -45,8 +68,10 @@ import TeacherSalary from "./pages/TeacherSalary";
 
 import Attendance from "./pages/Attendance";
 import Fees from "./pages/Fees";
+import FeeStructures from "./pages/FeeStructures";
 import Announcements from "./pages/Announcements";
 import Classes from "./pages/Classes";
+import WhatsAppSettings from "./pages/WhatsAppSettings";
 
 
 // ============================================================
@@ -81,6 +106,11 @@ function ProtectedRoute({ children, allowedRoles }) {
     );
   }
 
+  // Force password change if the account uses a temporary password
+  if (user?.must_change_password) {
+    return <Navigate to="/change-password" replace />;
+  }
+
   // Normalize role
   const userRole = String(
     user?.role || ""
@@ -95,6 +125,16 @@ function ProtectedRoute({ children, allowedRoles }) {
     return (
       <Navigate
         to="/dashboard"
+        replace
+      />
+    );
+  }
+
+  // Force password change on temporary password
+  if (user?.must_change_password) {
+    return (
+      <Navigate
+        to="/change-password"
         replace
       />
     );
@@ -123,12 +163,23 @@ function DashboardRedirect() {
     );
   }
 
+  // Force password change on temporary password
+  if (user?.must_change_password) {
+    return (
+      <Navigate
+        to="/change-password"
+        replace
+      />
+    );
+  }
+
   const role = String(
     user?.role || ""
   ).toUpperCase();
 
   // ADMIN
-  if (role === "ADMIN") {
+ // ADMIN and SCHOOL OWNER
+  if (role === "ADMIN" || role === "OWNER") {
     return (
       <Navigate
         to="/admin"
@@ -136,7 +187,6 @@ function DashboardRedirect() {
       />
     );
   }
-
   // TEACHER
   if (role === "TEACHER") {
     return (
@@ -167,6 +217,26 @@ function DashboardRedirect() {
 
 
 // ============================================================
+// CHANGE PASSWORD ROUTE
+// ============================================================
+
+function ChangePasswordRoute() {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <ChangePassword />;
+}
+
+
+// ============================================================
 // APP ROUTES
 // ============================================================
 
@@ -175,7 +245,7 @@ function AppRoutes() {
     <Routes>
 
       {/* ======================================================
-          LOGIN
+          LOGIN & RECOVERY
       ====================================================== */}
 
       <Route
@@ -183,9 +253,21 @@ function AppRoutes() {
         element={<Login />}
       />
       <Route
-      path="/register"
-      element={<Register />}
+        path="/forgot-password"
+        element={<ForgotPassword />}
       />
+      <Route
+        path="/reset-password"
+        element={<ResetPassword />}
+      />
+      <Route
+        path="/change-password"
+        element={<ChangePasswordRoute />}
+      />
+      {/* Public self-registration route */}
+      <Route path="/owner-register" element={<OwnerRegister />} />
+      <Route path="/register-school" element={<OwnerRegister />} />
+
 
 
       {/* ======================================================
@@ -204,14 +286,13 @@ function AppRoutes() {
           from DashboardLayout.
       ====================================================== */}
 
-      <Route
+<Route
         path="/admin"
         element={
-          <ProtectedRoute allowedRoles={["ADMIN"]}>
-            <DashboardLayout />
-          </ProtectedRoute>
-        }
-      >
+         <ProtectedRoute allowedRoles={["ADMIN", "OWNER"]}>
+              <DashboardLayout />
+            </ProtectedRoute>
+        }>
         <Route index element={<AdminDashboard />} />
         <Route path="students" element={<StudentsList />} />
         <Route path="students/:id" element={<StudentDetail />} />
@@ -220,9 +301,21 @@ function AppRoutes() {
         <Route path="attendance" element={<Attendance />} />
         <Route path="teacher-attendance" element={<TeacherAttendance />} />
         <Route path="fees" element={<Fees />} />
+        <Route path="fee-structures" element={<FeeStructures />} />
         <Route path="salaries" element={<TeacherSalary />} />
         <Route path="classes" element={<Classes />} />
         <Route path="announcements" element={<Announcements />} />
+        <Route path="whatsapp" element={<WhatsAppSettings />} />
+        <Route path="examinations" element={<ExaminationsList />} />
+        <Route path="examinations/create" element={<ExamCreate />} />
+        <Route path="examinations/:id" element={<ExamDetail />} />
+        <Route path="marks" element={<MarksList />} />
+        <Route path="report-cards" element={<ReportCard />} />
+        <Route path="documents" element={<DocumentsList />} />
+        <Route path="homework" element={<HomeworkList />} />
+        <Route path="homework/create" element={<HomeworkCreate />} />
+        <Route path="timetable" element={<TimetableList />} />
+        <Route path="fee-payments" element={<Fees />} />
       </Route>
 
 

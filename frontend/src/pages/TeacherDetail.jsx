@@ -13,6 +13,9 @@ import {
   AlertCircle,
   Pencil,
   MapPin,
+  KeyRound,
+  CheckCircle2,
+  Copy,
 } from 'lucide-react';
 
 import api from '../api/client';
@@ -32,7 +35,7 @@ export default function TeacherDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'OWNER';
 
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,34 @@ export default function TeacherDetail() {
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [resetMustChange, setResetMustChange] = useState(true);
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetResult, setResetResult] = useState(null);
+  const [resetError, setResetError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  async function handleAdminResetPassword(e) {
+    e.preventDefault();
+    setResetSaving(true);
+    setResetError('');
+    setResetResult(null);
+    try {
+      const userId = teacher?.user?.id;
+      if (!userId) throw new Error('Teacher user ID is missing.');
+      const res = await api.post(`/auth/users/${userId}/reset-password/`, {
+        new_password: resetPasswordValue.trim() || undefined,
+        must_change_password: resetMustChange,
+      });
+      setResetResult(res.data);
+    } catch (err) {
+      setResetError(err.response?.data?.detail || 'Failed to reset password.');
+    } finally {
+      setResetSaving(false);
+    }
+  }
 
   // ============================================================
   // LOAD TEACHER
@@ -343,13 +374,30 @@ export default function TeacherDetail() {
           </div>
         </div>
 
-        <button
-          onClick={loadTeacher}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"
-        >
-          <RefreshCw size={16} />
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={loadTeacher}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"
+          >
+            <RefreshCw size={16} />
+            Refresh
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setResetResult(null);
+                setResetError('');
+                setResetPasswordValue('');
+                setCopied(false);
+                setResetModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-300 dark:border-amber-700/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-sm font-medium text-amber-700 dark:text-amber-400"
+            >
+              <KeyRound size={16} />
+              Reset Password
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ========================================================
@@ -709,6 +757,108 @@ export default function TeacherDetail() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* RESET PASSWORD MODAL */}
+      <Modal
+        isOpen={resetModalOpen}
+        onClose={() => setResetModalOpen(false)}
+        title={`Reset Password — ${teacher?.user?.username || fullName}`}
+      >
+        {resetResult ? (
+          <div className="space-y-4 py-2">
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 space-y-3">
+              <div className="flex items-center gap-2 font-semibold">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                Password Reset Successfully!
+              </div>
+              <p className="text-xs">
+                The password for <strong>{teacher?.user?.username}</strong> has been updated.
+              </p>
+              <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] text-slate-500 block">New Temporary Password:</span>
+                  <span className="font-mono font-bold text-base text-slate-900 dark:text-white select-all">
+                    {resetResult.temporary_password}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(resetResult.temporary_password);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="px-3 py-1.5 rounded-md bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 text-xs font-medium flex items-center gap-1 transition"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              {resetResult.must_change_password && (
+                <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                  • The teacher will be required to set a new password on their next login.
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setResetModalOpen(false)}
+                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleAdminResetPassword} className="space-y-4 py-1">
+            {resetError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs">
+                {resetError}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                New Temporary Password (leave empty to auto-generate)
+              </label>
+              <input
+                type="text"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                placeholder="Auto-generated secure password if blank"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer pt-1">
+              <input
+                type="checkbox"
+                checked={resetMustChange}
+                onChange={(e) => setResetMustChange(e.target.checked)}
+                className="rounded text-brand-600 focus:ring-brand-500 w-4 h-4"
+              />
+              <span className="text-xs text-slate-700 dark:text-slate-300">
+                Force teacher to change password on next login
+              </span>
+            </label>
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setResetModalOpen(false)}
+                className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={resetSaving}
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {resetSaving ? 'Resetting...' : 'Reset Password'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
     </div>

@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function Announcements() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "OWNER";
 
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -297,8 +297,20 @@ export default function Announcements() {
                       {announcement.message}
                     </p>
 
+                    <div className="flex items-center gap-2 mt-2.5">
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                        Audience: {announcement.audience || 'ALL'}
+                      </span>
+                      {(announcement.whatsapp_sent || announcement.whatsapp_notification_count > 0) && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 font-medium inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          WhatsApp Dispatched {announcement.whatsapp_notification_count ? `(${announcement.whatsapp_notification_count})` : ''}
+                        </span>
+                      )}
+                    </div>
+
                     {announcement.created_at && (
-                      <p className="mt-3 text-xs text-slate-400">
+                      <p className="mt-2 text-xs text-slate-400">
                         {new Date(
                           announcement.created_at
                         ).toLocaleString("en-IN")}

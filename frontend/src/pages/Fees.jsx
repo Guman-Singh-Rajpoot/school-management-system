@@ -29,7 +29,7 @@ function formatDateTime(value) {
 
 export default function Fees() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "OWNER";
 
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -142,6 +142,18 @@ export default function Fees() {
           {money(row.pending_amount)}
         </span>
       ),
+    },
+    { key: "status",
+      header: "Status",
+      render: (row) => {
+        const status = row.payment_status || 'PENDING';
+        const cls = status === 'PAID'
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : status === 'PARTIALLY_PAID'
+          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+        return <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}`}>{status.replace('_', ' ')}</span>;
+      },
     },
     { key: "due_date", header: "Due Date", render: (row) => row.due_date || "-" },
     {

@@ -1,10 +1,13 @@
 from django.db import transaction
-from rest_framework import viewsets
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from apps.accounts.permissions import (
-    IsAdmin, IsAdminOrTeacher, IsSelfTeacher, IsSelfTeacherViaTeacherFK,
-    IsSelfTeacherViaTeacherSalaryFK,
+    IsAdmin, IsAdminOrTeacher, IsAdminOrOwnerOfObject, IsSchoolAdmin, IsSelfTeacher,
+    IsSelfTeacherViaTeacherFK, IsSelfTeacherViaTeacherSalaryFK,
 )
+from apps.announcements.whatsapp import send_salary_paid_notification
 from .models import Teacher, TeacherDocument, TeacherSalary, SalaryPayment, TeacherAttendance
 from .serializers import (
     TeacherSerializer, TeacherCreateSerializer, TeacherDocumentSerializer,
@@ -48,10 +51,10 @@ class TeacherViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ('create', 'destroy'):
-            return [IsAuthenticated(), IsAdmin()]
+            return [IsAuthenticated(), IsAdminOrOwnerOfObject(allowed_roles=('ADMIN', 'OWNER'))]
         if self.action in ('update', 'partial_update'):
-            # Only Admin may edit teacher records (salary, employment info, etc).
-            return [IsAuthenticated(), IsAdmin()]
+            # Only Admin / Owner may edit teacher records (salary, employment info, etc).
+            return [IsAuthenticated(), IsAdminOrOwnerOfObject(allowed_roles=('ADMIN', 'OWNER'))]
         # list / retrieve
         return [IsAuthenticated(), IsSelfTeacher()]
 
@@ -65,7 +68,8 @@ class TeacherDocumentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        if user.role == 'ADMIN':
+
+        if is_school_admin(user):
             return qs
         if user.role == 'TEACHER' and self.action == 'list':
             return qs.filter(teacher__user=user)
@@ -83,7 +87,7 @@ class TeacherDocumentViewSet(viewsets.ModelViewSet):
 
 
 class TeacherSalaryViewSet(viewsets.ModelViewSet):
-    """Monthly salary structure per teacher. Admin-managed; teacher reads own."""
+    """Monthly salary structure per teacher. Admin/owner-managed; teacher reads own."""
     queryset = TeacherSalary.objects.select_related('teacher__user').prefetch_related('payments').all()
     serializer_class = TeacherSalarySerializer
     filterset_fields = ['teacher', 'salary_month']
@@ -91,7 +95,8 @@ class TeacherSalaryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        if user.role == 'ADMIN':
+
+        if is_school_admin(user):
             return qs
         if user.role == 'TEACHER' and self.action == 'list':
             return qs.filter(teacher__user=user)
@@ -102,7 +107,7 @@ class TeacherSalaryViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated(), IsSelfTeacherViaTeacherFK()]
-        return [IsAuthenticated(), IsAdmin()]
+        return [IsAuthenticated(), IsAdminOrOwnerOfObject(allowed_roles=('ADMIN', 'OWNER'))]
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -110,7 +115,7 @@ class TeacherSalaryViewSet(viewsets.ModelViewSet):
 
 class SalaryPaymentViewSet(viewsets.ModelViewSet):
     """
-    Records an actual salary payment/instalment. Only Admin can create,
+    Records an actual salary payment/instalment. Only Admin / Owner can create,
     edit, or delete. A teacher may only read their own payment history.
     created_at / created_by are always set server-side.
     """
@@ -121,7 +126,8 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        if user.role == 'ADMIN':
+
+        if is_school_admin(user):
             return qs
         if user.role == 'TEACHER' and self.action == 'list':
             return qs.filter(teacher_salary__teacher__user=user)
@@ -140,7 +146,12 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        payment = serializer.save(created_by=self.request.user)
+        # Send WhatsApp salary payment notification (never breaks the request if misconfigured).
+        try:
+            send_salary_paid_notification(payment)
+        except Exception:
+            pass
 
 
 class TeacherAttendanceViewSet(viewsets.ModelViewSet):
@@ -163,10 +174,61 @@ class TeacherAttendanceViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated(), IsSelfTeacherViaTeacherFK()]
-        return [IsAuthenticated(), IsAdminOrTeacher()]
+        return [IsAuthenticated(), IsAdminOrOwnerOfObject(allowed_roles=('ADMIN', 'OWNER'))]
 
     def perform_create(self, serializer):
         serializer.save(marked_by=self.request.user)
 
     def perform_update(self, serializer):
         serializer.save(marked_by=self.request.user)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdmin])
+    def bulk_mark(self, request):
+        """Admin marks attendance for multiple teachers at once."""
+        date_str = request.data.get('date')
+        records = request.data.get('records', [])
+        if not date_str or not isinstance(records, list):
+            return Response({'detail': 'date and records list are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check duplicate teacher IDs
+        t_ids = [r.get('teacher') for r in records if r.get('teacher')]
+        if len(t_ids) != len(set(t_ids)):
+            return Response({'detail': 'Duplicate teacher IDs in submission.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_ids = []
+        with transaction.atomic():
+            for r in records:
+                t_id = r.get('teacher')
+                st = r.get('status')
+                remarks = r.get('remarks', '')
+                if not t_id:
+                    continue
+                if st in ('NOT_MARKED', '', None):
+                    TeacherAttendance.objects.filter(teacher_id=t_id, date=date_str).delete()
+                else:
+                    obj, _ = TeacherAttendance.objects.update_or_create(
+                        teacher_id=t_id,
+                        date=date_str,
+                        defaults={'status': st, 'remarks': remarks, 'marked_by': request.user}
+                    )
+                    updated_ids.append(obj.id)
+
+        return Response({
+            'detail': f'Teacher attendance saved for {len(updated_ids)} teachers.',
+            'updated_count': len(updated_ids),
+            'date': str(date_str),
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        qs = self.filter_queryset(self.get_queryset())
+        total = qs.count()
+        present = qs.filter(status=TeacherAttendance.Status.PRESENT).count()
+        absent = qs.filter(status=TeacherAttendance.Status.ABSENT).count()
+        percentage = round((present / total) * 100, 2) if total else 0
+        return Response({
+            'total_records': total,
+            'present_count': present,
+            'absent_count': absent,
+            'attendance_percentage': percentage,
+        })

@@ -1,0 +1,15 @@
+venv
+.env
+*.db
+__pycache__
+*.pyc
+*.pyw
+*.pyd
+*.egg-info/
+*.egg/
+build/
+staticfiles/
+media
+*.pot
+*.po
+.DS_Store

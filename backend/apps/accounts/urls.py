@@ -7,11 +7,8 @@ from . import views
 urlpatterns = [
 
     # Register
-    path(
-        "register/",
-        views.RegisterView.as_view(),
-        name="register",
-    ),
+    path("register/", views.RegisterView.as_view(), name="register"),
+    path("owner-register/", views.OwnerRegisterView.as_view(), name="owner-register"),
 
     # Login
     path(
@@ -59,5 +56,27 @@ urlpatterns = [
         "users/<int:pk>/",
         views.UserDetailView.as_view(),
         name="user-detail",
+    ),
+    path(
+        "users/<int:pk>/reset-password/",
+        views.AdminResetUserPasswordView.as_view(),
+        name="admin-user-reset-password",
+    ),
+
+    # Password Recovery
+    path(
+        "password-reset/request/",
+        views.PasswordResetRequestView.as_view(),
+        name="password-reset-request",
+    ),
+    path(
+        "password-reset/validate/",
+        views.PasswordResetValidateView.as_view(),
+        name="password-reset-validate",
+    ),
+    path(
+        "password-reset/confirm/",
+        views.PasswordResetConfirmView.as_view(),
+        name="password-reset-confirm",
     ),
 ]

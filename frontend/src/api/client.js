@@ -15,8 +15,20 @@ import axios from "axios";
 |--------------------------------------------------------------------------
 */
 
+function getBaseURL() {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (typeof envUrl === "string" && envUrl.trim().length > 0) {
+    return envUrl.trim().replace(/\/+$/, "");
+  }
+  // In development, default to "/api" which Vite proxies to http://127.0.0.1:8000
+  if (import.meta.env.DEV) {
+    return "/api";
+  }
+   return "http://localhost:8000/api";
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "https://school-management-system-8lht.onrender.com/api",
+  baseURL: getBaseURL(),
   headers: {
     "Content-Type": "application/json",
   },
@@ -26,7 +38,9 @@ const api = axios.create({
 |--------------------------------------------------------------------------
 | REQUEST INTERCEPTOR
 |--------------------------------------------------------------------------
-| Automatically attach JWT access token.
+| Automatically attach JWT access token for authenticated endpoints.
+| Omit for login, refresh, register, and health checks to avoid sending
+| expired tokens that cause 401s on unauthenticated views.
 |--------------------------------------------------------------------------
 */
 
@@ -34,7 +48,14 @@ api.interceptors.request.use(
   (config) => {
     const accessToken = localStorage.getItem("access_token");
 
-    if (accessToken) {
+    const isPublicEndpoint =
+      config.url?.includes("/auth/login/") ||
+      config.url?.includes("/auth/register/") ||
+      config.url?.includes("/auth/refresh/") ||
+      config.url?.includes("/auth/password-reset/") ||
+      config.url?.includes("/health/");
+
+    if (accessToken && !isPublicEndpoint) {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
@@ -111,7 +132,8 @@ api.interceptors.response.use(
     if (
       originalRequest.url?.includes("/auth/login/") ||
       originalRequest.url?.includes("/auth/token/") ||
-      originalRequest.url?.includes("/auth/refresh/")
+      originalRequest.url?.includes("/auth/refresh/") ||
+      originalRequest.url?.includes("/auth/password-reset/")
     ) {
       return Promise.reject(error);
     }
@@ -236,6 +258,18 @@ api.interceptors.response.use(
     }
   }
 );
+
+export async function checkBackendHealth() {
+  try {
+    const response = await api.get("/health/");
+    return response.data;
+  } catch (error) {
+    return {
+      status: "unreachable",
+      error: error.response?.data || error.message,
+    };
+  }
+}
 
 export default api;
 

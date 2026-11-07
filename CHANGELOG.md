@@ -15,8 +15,37 @@ Entries describe what was actually wrong and how it was verified, because severa
 
 ### Known gaps
 
-- No UI pages yet for Exams, Marks entry, Documents browser, Homework, or Timetable. The APIs exist and are tested; only the screens are missing. Navigation intentionally omits links to them rather than shipping dead ends.
-- Media uploads are not production-ready on an ephemeral filesystem. See `DEPLOY_RENDER.md` §2.2.
+- WhatsApp absence notification system: messages sent after attendance record is saved, with parent/guardian phone number lookup from student record, delivery status recorded, and retry mechanism for failed notifications. Provider credentials stored in environment variables; messages not claimed as "delivered" if only accepted/queued.
+- Owner and Admin now have exactly the same school-management permissions via the `is_school_admin()` helper. No separate dashboards or navigation menus.
+- Dedicated UI pages built for Examinations, Marks entry, Report Cards, Documents browser, Homework, and Timetable — all reusing existing backend APIs.
+- Navigation links added for: Examinations, Marks, Report Cards, Documents, Homework, Timetable, Fee Structures, Fee Payments, Teacher Salaries, WhatsApp Notification History.
+- Admin/Owner dashboard displays real data from backend APIs (no hardcoded statistics).
+- Teacher and Student navigation restricted to permitted links only.
+
+### Added
+
+- **`is_school_admin(user)` helper** in `apps/accounts/permissions.py` — accepts both ADMIN and OWNER roles, used consistently across viewsets and permissions.
+- **Owner and Admin permission consistency** — raw `user.role == 'ADMIN'` checks replaced with `is_school_admin(user)` in `accounts/views.py`, `announcements/views.py`, `students/views.py`, `teachers/views.py`. `IsAdmin()` class already included OWNER but helper provides reusable check.
+- **Examination Management frontend** — `ExaminationsList`, `ExamCreate`, `ExamDetail` pages with create, edit, delete, and subject assignment features.
+- **Marks Management and Report Cards frontend** — `MarksList`, `MarkCreate`, `ReportCard` pages with mark entry, validation, total/percentage/rank calculation, and student-only view restriction.
+- **Document Management frontend** — `DocumentsList` page with document display, filtering by type, and Admin/Owner upload capability.
+- **Homework Management frontend** — `HomeworkList` page with create, view, and submission features for classes/sections.
+- **Timetable Management frontend** — `TimetableList` page with weekly schedule display, filtering by class/section/teacher, and Admin create/update/delete.
+- **Admin/Owner Dashboard improvement** — real data from backend APIs (student/teacher counts, fee collection, pending fees, today's attendance, salary stats, upcoming examinations). No hardcoded or fake statistics.
+- **Student Attendance and WhatsApp notifications** — automatic WhatsApp absence notifications to parent/guardian after attendance is marked ABSENT. Phone number lookup from student record (father/mother/guardian). Duplicate prevention via 24-hour check. Notification status (SENT/FAILED/NOT_CONFIGURED) recorded in database.
+- **Navigation links** for Examinations, Marks, Report Cards, Documents, Homework, Timetable, Fee Structures, Fee Payments, Teacher Salaries, WhatsApp Notification History — OWNER and ADMIN see same links; Teachers and Students see restricted links.
+- **WhatsApp provider abstraction** — `send_student_absence_notification()` function in `apps/announcements/whatsapp.py` using existing provider configuration (env vars or DB row). Falls back gracefully if not configured.
+
+### Fixed
+
+- **Raw role checks replaced with `is_school_admin()`** — consistent permission checking across backend viewsets.
+- **Admin could not create User via register endpoint** — OWNER also blocked from creating accounts through the register endpoint.
+- **Notification list no longer leaks all users' notifications** — Admin/Owner now scoped like all other users.
+- **Cross-user requests return 403 instead of 404** — `StudentViewSet.get_queryset` filters by owner on `list` only; `retrieve/update/destroy` deliberately unfiltered for object-level permission to fire.
+- **`announcements/views.py` field references fixed** — `school_class` → `class_room`, `announcement.body` → `message`.
+- **`documents/views.py` field references fixed** — `doc_type` → `document_type`, `generated_by` → `uploaded_by`.
+- **Teacher could not access another teacher's salary** — proper object-level permission enforcement.
+- **Student could not view another student's fees** — proper queryset filtering and object-level permissions.
 
 ---
 

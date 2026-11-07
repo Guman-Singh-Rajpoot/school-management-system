@@ -1,3 +1,4 @@
+
 import { Search, Plus, FolderOpen, Trash2, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -7,7 +8,6 @@ import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import AddStudentForm from '../components/AddStudentForm';
 import DocumentsPanel from '../components/DocumentsPanel';
-
 import { useAuth } from '../context/AuthContext';
 
 const DOC_TYPES = [
@@ -35,7 +35,10 @@ export default function StudentsList() {
   const [addOpen, setAddOpen] = useState(false);
   const [docsStudent, setDocsStudent] = useState(null);
 
-  const isAdmin = user?.role === 'ADMIN';
+  // ADMIN and OWNER can manage students.
+  const canManageStudents = ['ADMIN', 'OWNER'].includes(
+    String(user?.role || '').toUpperCase()
+  );
 
   async function load() {
     try {
@@ -48,18 +51,6 @@ export default function StudentsList() {
           : {},
       });
 
-      /*
-       * Django REST Framework normally returns:
-       *
-       * {
-       *   count: ...,
-       *   next: ...,
-       *   previous: ...,
-       *   results: [...]
-       * }
-       *
-       * But this also supports a plain array.
-       */
       const data = Array.isArray(res.data)
         ? res.data
         : res.data?.results || [];
@@ -92,8 +83,8 @@ export default function StudentsList() {
   }, [search]);
 
   async function handleDelete(row) {
-    if (!isAdmin) {
-      setError('Only Admin can delete students.');
+    if (!canManageStudents) {
+      setError('You do not have permission to delete students.');
       return;
     }
 
@@ -114,10 +105,6 @@ export default function StudentsList() {
 
       await api.delete(`/students/${row.id}/`);
 
-      /*
-       * Remove the deleted student immediately from the UI.
-       * Then reload from backend to keep frontend synchronized.
-       */
       setStudents((current) =>
         current.filter((student) => student.id !== row.id)
       );
@@ -140,19 +127,11 @@ export default function StudentsList() {
       key: 'admission_number',
       header: 'Admission No.',
     },
-
     {
       key: 'full_name',
       header: 'Name',
       render: (row) => {
-        /*
-         * Prefer serializer's full_name.
-         * Fall back to first_name/last_name if full_name
-         * isn't returned by the backend.
-         */
-        if (row.full_name) {
-          return row.full_name;
-        }
+        if (row.full_name) return row.full_name;
 
         return (
           `${row.first_name || ''} ${row.middle_name || ''} ${
@@ -163,7 +142,6 @@ export default function StudentsList() {
         );
       },
     },
-
     {
       key: 'class_name',
       header: 'Class',
@@ -174,7 +152,6 @@ export default function StudentsList() {
         row.school_class?.class_name ||
         '-',
     },
-
     {
       key: 'section_name',
       header: 'Section',
@@ -184,7 +161,6 @@ export default function StudentsList() {
         row.section?.section_name ||
         '-',
     },
-
     {
       key: 'mobile_number',
       header: 'Mobile',
@@ -194,7 +170,6 @@ export default function StudentsList() {
         row.user?.phone_number ||
         '-',
     },
-
     {
       key: 'status',
       header: 'Status',
@@ -210,12 +185,19 @@ export default function StudentsList() {
         </span>
       ),
     },
-
     {
       key: 'actions',
       header: 'Documents / Actions',
       render: (row) => (
         <div className="flex items-center gap-1">
+          {/* View student */}
+          <button
+            onClick={() => navigate(`/admin/students/${row.id}`)}
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-brand-600"
+            title="View student"
+          >
+            <Eye size={16} />
+          </button>
 
           {/* Documents */}
           <button
@@ -226,8 +208,8 @@ export default function StudentsList() {
             <FolderOpen size={16} />
           </button>
 
-          {/* Delete - Admin only */}
-          {isAdmin && (
+          {/* Delete - ADMIN and OWNER */}
+          {canManageStudents && (
             <button
               onClick={() => handleDelete(row)}
               className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-red-500"
@@ -236,7 +218,6 @@ export default function StudentsList() {
               <Trash2 size={16} />
             </button>
           )}
-
         </div>
       ),
     },
@@ -244,22 +225,18 @@ export default function StudentsList() {
 
   return (
     <div className="space-y-6">
-
       {/* Header */}
       <div className="flex items-center justify-between">
-
         <div>
-          <h1 className="text-2xl font-semibold">
-            Students
-          </h1>
+          <h1 className="text-2xl font-semibold">Students</h1>
 
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Manage student records, enrollment, and documents.
           </p>
         </div>
 
-        {/* Add Student - Admin only */}
-        {isAdmin && (
+        {/* Add Student - ADMIN and OWNER */}
+        {canManageStudents && (
           <button
             onClick={() => setAddOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium"
@@ -268,14 +245,6 @@ export default function StudentsList() {
             Add student
           </button>
         )}
-        <button
-  onClick={() => navigate(`/admin/students/${row.id}`)}
-  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-brand-600"
-  title="View student"
->
-  <Eye size={16} />
-</button>
-
       </div>
 
       {/* API Error */}
@@ -289,7 +258,6 @@ export default function StudentsList() {
       <Card
         action={
           <div className="relative">
-
             <Search
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -301,11 +269,9 @@ export default function StudentsList() {
               placeholder="Search by name, admission no, mobile…"
               className="pl-9 pr-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
-
           </div>
         }
       >
-
         <DataTable
           columns={columns}
           rows={students}
@@ -316,11 +282,10 @@ export default function StudentsList() {
               : 'No students found. Add a student above.'
           }
         />
-
       </Card>
 
       {/* Add Student Modal */}
-      {isAdmin && (
+      {canManageStudents && (
         <Modal
           open={addOpen}
           onClose={() => setAddOpen(false)}
@@ -363,8 +328,6 @@ export default function StudentsList() {
           />
         )}
       </Modal>
-
     </div>
   );
 }
-

@@ -303,3 +303,112 @@ class DashboardAccessTests(BaseAPITestCase):
         self.auth_as(self.admin)
         resp = self.client.get('/api/documents/backups/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+
+class AdminPasswordResetAndForceChangeTests(BaseAPITestCase):
+    def setUp(self):
+        self.admin = make_admin()
+        self.teacher = make_teacher('teachE', employee_id='EMP-E')
+        self.student = make_student('studentE')
+
+    def test_admin_can_reset_user_password(self):
+        self.auth_as(self.admin)
+        resp = self.client.post(
+            f'/api/auth/users/{self.student.user.id}/reset-password/',
+            {'new_password': 'TempPassword99!', 'must_change_password': True},
+            format='json'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.student.user.refresh_from_db()
+        self.assertTrue(self.student.user.check_password('TempPassword99!'))
+        self.assertTrue(self.student.user.must_change_password)
+
+    def test_non_admin_cannot_reset_user_password(self):
+        self.auth_as(self.teacher.user)
+        resp = self.client.post(
+            f'/api/auth/users/{self.student.user.id}/reset-password/',
+            {'new_password': 'TempPassword99!'},
+            format='json'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_force_password_change_clears_flag(self):
+        # User has must_change_password=True
+        self.student.user.must_change_password = True
+        self.student.user.set_password('OldPassword123!')
+        self.student.user.save()
+
+        self.auth_as(self.student.user)
+        resp = self.client.post(
+            '/api/auth/change-password/',
+            {'old_password': 'OldPassword123!', 'new_password': 'NewSecurePassword123!'},
+            format='json'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.student.user.refresh_from_db()
+        self.assertTrue(self.student.user.check_password('NewSecurePassword123!'))
+        self.assertFalse(self.student.user.must_change_password)
+
+
+class RollNumberUniquenessTests(BaseAPITestCase):
+    def setUp(self):
+        self.admin = make_admin()
+        self.session = Session.objects.create(name='2026-2027', start_date=date(2026, 4, 1), end_date=date(2027, 3, 31))
+        self.school_class = SchoolClass.objects.create(name='Class 9', session=self.session)
+        from apps.academics.models import Section
+        self.section = Section.objects.create(name='A', class_room=self.school_class)
+
+    def test_duplicate_roll_number_in_same_class_section_rejected(self):
+        self.auth_as(self.admin)
+        # First student
+        payload1 = {
+            'username': 'student_roll1', 'email': 'roll1@example.com', 'first_name': 'First',
+            'last_name': 'One', 'password': 'pass12345',
+            'admission_number': 'ADM-R1', 'gender': 'M',
+            'date_of_birth': '2012-05-01', 'admission_date': '2022-04-01',
+            'school_class': self.school_class.id, 'section': self.section.id,
+            'roll_number': '101',
+        }
+        resp1 = self.client.post('/api/students/', payload1, format='json')
+        self.assertEqual(resp1.status_code, status.HTTP_201_CREATED)
+
+        # Second student with same roll number in same class and section
+        payload2 = {
+            'username': 'student_roll2', 'email': 'roll2@example.com', 'first_name': 'Second',
+            'last_name': 'Two', 'password': 'pass12345',
+            'admission_number': 'ADM-R2', 'gender': 'M',
+            'date_of_birth': '2012-05-01', 'admission_date': '2022-04-01',
+            'school_class': self.school_class.id, 'section': self.section.id,
+            'roll_number': '101',
+        }
+        resp2 = self.client.post('/api/students/', payload2, format='json')
+        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
+        # Duplicate prevention may surface as a field error (serializer validate)
+        # or a non_field error (DB unique_together constraint) -- both prevent duplicates.
+        self.assertTrue(
+            'roll_number' in resp2.data or 'non_field_errors' in resp2.data,
+            f"Expected duplicate roll_number error, got: {resp2.data}"
+        )
+
+
+class WhatsAppPermissionTests(BaseAPITestCase):
+    def setUp(self):
+        self.admin = make_admin()
+        self.student = make_student('studentWA')
+
+    def test_admin_can_access_whatsapp_config_status(self):
+        self.auth_as(self.admin)
+        resp = self.client.get('/api/announcements/whatsapp-config/status/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn('is_configured', resp.data)
+
+    def test_student_cannot_access_whatsapp_config(self):
+        self.auth_as(self.student.user)
+        resp = self.client.get('/api/announcements/whatsapp-config/status/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_access_whatsapp_notifications(self):
+        self.auth_as(self.admin)
+        resp = self.client.get('/api/announcements/whatsapp-notifications/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+

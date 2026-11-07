@@ -22,7 +22,7 @@ const EMPTY_FORMS = {
 
 export default function Classes() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "OWNER";
 
   const [tab, setTab] = useState("sessions");
 

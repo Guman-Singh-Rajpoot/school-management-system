@@ -2,6 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 from apps.accounts.serializers import UserSerializer
 from apps.accounts.models import User
+from apps.announcements.whatsapp import send_account_created_notification
 from .models import Teacher, TeacherDocument, TeacherSalary, SalaryPayment, TeacherAttendance
 
 
@@ -89,6 +90,13 @@ class TeacherSerializer(serializers.ModelSerializer):
         model = Teacher
         fields = '__all__'
 
+    def update(self, instance, validated_data):
+        is_active = self.initial_data.get('is_active')
+        if is_active is not None and instance.user:
+            instance.user.is_active = bool(is_active)
+            instance.user.save(update_fields=['is_active'])
+        return super().update(instance, validated_data)
+
 
 class TeacherPublicSerializer(serializers.ModelSerializer):
     """A version of the teacher record with no financial/private fields.
@@ -103,7 +111,7 @@ class TeacherPublicSerializer(serializers.ModelSerializer):
         model = Teacher
         fields = [
             'id', 'user', 'full_name', 'employee_id', 'department',
-            'qualification', 'subjects', 'classes', 'joining_date',
+            'qualification', 'subjects', 'classes', 'sections', 'joining_date',
         ]
 
 
@@ -114,15 +122,19 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True, min_length=8)
+    phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    whatsapp_number = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    must_change_password = serializers.BooleanField(write_only=True, required=False, default=True)
     experience_years = serializers.IntegerField(required=False, default=0)
 
     class Meta:
         model = Teacher
         fields = [
             'id',
-            'username', 'email', 'first_name', 'last_name', 'password',
+            'username', 'email', 'first_name', 'last_name', 'password', 'phone',
+            'whatsapp_number', 'must_change_password',
             'employee_id', 'gender', 'date_of_birth', 'qualification',
-            'experience_years', 'department', 'subjects', 'classes',
+            'experience_years', 'department', 'subjects', 'classes', 'sections',
             'aadhaar_number', 'pan_number', 'bank_account_number', 'bank_ifsc',
             'bank_name', 'salary', 'joining_date', 'address',
         ]
@@ -151,11 +163,15 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         subjects = validated_data.pop('subjects', [])
         classes = validated_data.pop('classes', [])
+        sections = validated_data.pop('sections', [])
         username = validated_data.pop('username').strip()
         email = validated_data.pop('email').strip().lower()
         first_name = validated_data.pop('first_name').strip()
         last_name = validated_data.pop('last_name').strip()
         password = validated_data.pop('password')
+        phone = validated_data.pop('phone', '').strip()
+        whatsapp_number = validated_data.pop('whatsapp_number', '').strip() or phone
+        must_change_password = validated_data.pop('must_change_password', True)
 
         user = User.objects.create_user(
             username=username,
@@ -163,14 +179,27 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
             first_name=first_name,
             last_name=last_name,
             password=password,
+            phone=phone,
+            whatsapp_number=whatsapp_number,
             role=User.Role.TEACHER,
+            must_change_password=must_change_password,
         )
         teacher = Teacher.objects.create(user=user, **validated_data)
         if subjects:
             teacher.subjects.set(subjects)
         if classes:
             teacher.classes.set(classes)
+        if sections:
+            teacher.sections.set(sections)
+
+        try:
+            from apps.announcements.whatsapp import send_account_created_notification
+            send_account_created_notification(user, password)
+        except Exception:
+            pass
+
         return teacher
+
 
     def to_representation(self, instance):
         return TeacherSerializer(instance, context=self.context).data

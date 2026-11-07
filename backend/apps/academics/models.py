@@ -3,16 +3,23 @@ from django.db import models
 
 class Session(models.Model):
     """
-    Academic session/year.
+    Academic session/year, owned by a school.
 
     Example:
         2025-2026
         2026-2027
     """
 
+    school = models.ForeignKey(
+        'accounts.School',
+        on_delete=models.CASCADE,
+        related_name='sessions',
+        null=True,
+        blank=True,
+    )
+
     name = models.CharField(
-        max_length=20,
-        unique=True
+        max_length=20
     )
 
     start_date = models.DateField()
@@ -28,6 +35,12 @@ class Session(models.Model):
 
     class Meta:
         ordering = ["-start_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["school", "name"],
+                name="unique_session_name_per_school",
+            ),
+        ]
         verbose_name = "Academic Session"
         verbose_name_plural = "Academic Sessions"
 

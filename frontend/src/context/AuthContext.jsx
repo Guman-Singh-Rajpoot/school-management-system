@@ -533,7 +533,7 @@ export function AuthProvider({ children }) {
     role,
 
     isAdmin:
-      role === "ADMIN",
+      role === "ADMIN" || role === "OWNER",
 
     isTeacher:
       role === "TEACHER",

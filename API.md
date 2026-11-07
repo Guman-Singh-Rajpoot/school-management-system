@@ -8,6 +8,22 @@ List responses are paginated — `{count, next, previous, results}` — 20 per p
 
 > This file is written from the actual routers and serializers. If it disagrees with `/api/docs/`, trust `/api/docs/` and fix this file.
 
+## System & Health — `/api/`
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/` | — | Redirects to interactive API documentation (`/api/docs/`) |
+| GET | `/api/` | — | API status and directory index |
+| GET | `/api/health/` | — | Unauthenticated health & database status check |
+
+**Health Check Response:**
+```json
+{
+  "status": "healthy",
+  "database": "connected"
+}
+```
+
 ## Auth — `/api/auth/`
 
 | Method | Path | Auth | Purpose |

@@ -1,6 +1,13 @@
 #!/usr/bin/env python
 import os
 import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env file from project root
+project_root = Path(__file__).resolve().parent.parent
+load_dotenv(dotenv_path=project_root / ".env")
 
 def main():
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')

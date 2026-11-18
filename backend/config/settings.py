@@ -288,6 +288,10 @@ SPECTACULAR_SETTINGS = {
 _cors_env = config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
 
 _default_cors = [
+    # Render frontend
+    "https://school-management-frontend-jr75.onrender.com",
+
+    # Vercel frontend
     "https://school-management-system-theta-sepia.vercel.app",
 
     # Local development
@@ -320,7 +324,13 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 _csrf_env = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
 
 _default_csrf = [
+    # Render frontend
+    "https://school-management-frontend-jr75.onrender.com",
+
+    # Vercel frontend
     "https://school-management-system-theta-sepia.vercel.app",
+
+    # Local development
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
@@ -378,7 +388,7 @@ DEFAULT_FROM_EMAIL = config(
 
 FRONTEND_URL = config(
     "FRONTEND_URL",
-    default="http://localhost:3000",
+    default="https://school-management-frontend-jr75.onrender.com",
 )
 
 

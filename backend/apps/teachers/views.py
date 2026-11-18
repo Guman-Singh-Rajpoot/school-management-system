@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from apps.accounts.permissions import (
     IsAdmin, IsAdminOrTeacher, IsAdminOrOwnerOfObject, IsSchoolAdmin, IsSelfTeacher,
-    IsSelfTeacherViaTeacherFK, IsSelfTeacherViaTeacherSalaryFK,
+    IsSelfTeacherViaTeacherFK, IsSelfTeacherViaTeacherSalaryFK, is_school_admin,
 )
 from apps.announcements.whatsapp import send_salary_paid_notification
 from .models import Teacher, TeacherDocument, TeacherSalary, SalaryPayment, TeacherAttendance

@@ -187,11 +187,19 @@ class IsAdminOrOwnerOfObject(BasePermission):
     owner_attr = 'user'
     allowed_roles = ()
 
+    def __init__(self, allowed_roles=None, owner_attr=None):
+        if allowed_roles is not None:
+            self.allowed_roles = tuple(allowed_roles)
+        if owner_attr is not None:
+            self.owner_attr = owner_attr
+
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-        )
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if user.role in ('ADMIN', 'OWNER') or user.is_staff or user.is_superuser:
+            return True
+        return user.role in self.allowed_roles
 
     def has_object_permission(self, request, view, obj):
         user = request.user

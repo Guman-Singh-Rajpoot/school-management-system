@@ -108,7 +108,12 @@ function ProtectedRoute({ children, allowedRoles }) {
 
   // Force password change if the account uses a temporary password
   if (user?.must_change_password) {
-    return <Navigate to="/change-password" replace />;
+    return (
+      <Navigate
+        to="/change-password"
+        replace
+      />
+    );
   }
 
   // Normalize role
@@ -125,16 +130,6 @@ function ProtectedRoute({ children, allowedRoles }) {
     return (
       <Navigate
         to="/dashboard"
-        replace
-      />
-    );
-  }
-
-  // Force password change on temporary password
-  if (user?.must_change_password) {
-    return (
-      <Navigate
-        to="/change-password"
         replace
       />
     );
@@ -308,12 +303,16 @@ function AppRoutes() {
         <Route path="whatsapp" element={<WhatsAppSettings />} />
         <Route path="examinations" element={<ExaminationsList />} />
         <Route path="examinations/create" element={<ExamCreate />} />
+        <Route path="examinations/:id/edit" element={<ExamCreate />} />
         <Route path="examinations/:id" element={<ExamDetail />} />
         <Route path="marks" element={<MarksList />} />
+        <Route path="marks/create" element={<MarkCreate />} />
+        <Route path="marks/:id/edit" element={<MarkCreate />} />
         <Route path="report-cards" element={<ReportCard />} />
         <Route path="documents" element={<DocumentsList />} />
         <Route path="homework" element={<HomeworkList />} />
         <Route path="homework/create" element={<HomeworkCreate />} />
+        <Route path="homework/:id/edit" element={<HomeworkCreate />} />
         <Route path="timetable" element={<TimetableList />} />
         <Route path="fee-payments" element={<Fees />} />
       </Route>

@@ -8,6 +8,21 @@ Entries describe what was actually wrong and how it was verified, because severa
 
 ## [Unreleased]
 
+### Fixed (frontend build and routing audit)
+
+- **Invalid React Router hooks removed** — `useRouter` / `useReactive` (not exported by `react-router-dom`) replaced with `useParams`, `useSearchParams`, `useNavigate`, `useLocation`-style APIs in `ExamCreate`, `MarkCreate`, `MarksList`, `HomeworkList`, `HomeworkCreate`, `TimetableList`. The production build failed with 5 missing-export errors.
+- **Missing imports** — `Link`, `FolderOpen`, `Layout`, `Plus`, `Pencil`/`Trash2` usage corrected; `TeachersList` called `navigate()` without declaring it (runtime crash on the view-teacher button).
+- **Route coverage** — added `/admin/examinations/:id/edit`, `/admin/marks/:id/edit`, `/admin/homework/:id/edit`. Edit pages now load existing records (exams, marks, homework). Report Cards page reworked to `?student=&exam=` search params with working student/exam selectors.
+- **Broken links and dead code removed** — edit links pointed at non-existent `/admin/examinations/create/:id`, `/admin/marks/create/:id`, `/admin/homework/create/:id`, `/admin/timetable/:id`; all now target registered routes or were replaced with real edit/delete actions. Dead always-closed modals and the `uuid` dependency removed.
+- **Marks** — exam filter now uses `?exam=<id>` search param hitting `exam_subject__exam`; grades come from the API (Grade is a FK, not a static letter list).
+- **Homework** — class and section filters work via `?class=&section=` search params (backend gains `section__class_room` filter). Create/edit/delete fully wired to `/api/homework/`.
+- **Timetable** — section and teacher filters work via `?section=&teacher=`; admins can create/edit/delete slots from the page; broken per-row links to nonexistent detail pages removed.
+- **Examinations** — list page called `/api/exams/` (404) with the wrong endpoint; create/edit now load class/session dropdowns from `/api/academics/classes|sessions/`; exam-subject add/remove works.
+- **Documents browser** — field names corrected (`document_type`, `uploaded_by_name`), dead upload modal and nonexistent `verified` column removed, delete now calls the API.
+- **Backend bugs fixed while verifying** (pre-existing, blocking `/api/teachers/` and the test suite): `IsAdminOrOwnerOfObject` never accepted constructor kwargs (`TypeError: takes no arguments` on teacher create/salary write) and `apps/teachers/views.py` used `is_school_admin` without importing it. `has_permission` now also enforces `allowed_roles` with ADMIN/OWNER bypass. Test suite: 6 errors → **70/70 passing**.
+- **Serializer additions** (read-only, additive only): `ExamSerializer.school_class_name/session_name`, `MarkSerializer.exam_name/grade_name`, `HomeworkSerializer.section_name/class_name`, `TimetableSlotSerializer.section_name/class_name`, `GeneratedDocumentSerializer.document_type_display/uploaded_by_name`.
+- `npm run build` and `npm run lint` pass.
+
 ### Documentation
 
 - Added `README.md`, `SPEC.md`, `ARCHITECTURE.md`, `API.md`, `CHANGELOG.md`, `CLAUDE.md`, `CONTRIBUTING.md`, and `DEPLOY_RENDER.md`.

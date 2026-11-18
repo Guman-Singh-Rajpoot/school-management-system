@@ -1,26 +1,35 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import Card from "../components/Card";
-import DataTable from "../components/DataTable";
-import Modal from "../components/Modal";
-import { Plus, Eye, Trash, Calendar } from "lucide-react";
+
+function flattenErrors(data, fallback) {
+  if (!data || typeof data !== "object") return fallback;
+  if (typeof data.detail === "string") return data.detail;
+  return (
+    Object.entries(data)
+      .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+      .join(" | ") || fallback
+  );
+}
 
 export default function HomeworkCreate() {
   const { user } = useAuth();
-  const router = useRouter();
-  const examId = router.query.examId || null;
+  const navigate = useNavigate();
+  // /admin/homework/create     -> create
+  // /admin/homework/:id/edit   -> edit
+  const { id: homeworkId } = useParams();
+  const editing = Boolean(homeworkId);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  const canManage =
-    ["ADMIN", "OWNER"].includes(String(user?.role || "").toUpperCase());
-
-  const isTeacher = ["TEACHER"].includes(String(user?.role || "").toUpperCase());
-  const isStudent = ["STUDENT"].includes(String(user?.role || "").toUpperCase());
+  const canManage = ["ADMIN", "OWNER"].includes(
+    String(user?.role || "").toUpperCase()
+  );
 
   const [homework, setHomework] = useState({
     title: "",
@@ -28,97 +37,107 @@ export default function HomeworkCreate() {
     section: "",
     subject: "",
     due_date: "",
+    teacher: "",
   });
 
   const [sections, setSections] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [teachers, setTeachers] = useState([]);
-  const [exams, setExams] = useState([]);
-
-  async function loadSections() {
-    try {
-      const res = await api.get("/academics/sections/");
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data?.results || [];
-      setSections(data);
-    } catch (err) {
-      console.error("Failed to load sections:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadSubjects() {
-    try {
-      const res = await api.get("/academics/subjects/");
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data?.results || [];
-      setSubjects(data);
-    } catch (err) {
-      console.error("Failed to load subjects:", err);
-    }
-  }
-
-  async function loadTeachers() {
-    try {
-      const res = await api.get("/teachers/");
-      const data = Array.isArray(res.data) ? res.data?.results || res.data || [] : [];
-      setTeachers(data);
-    } catch (err) {
-      console.error("Failed to load teachers:", err);
-    }
-  }
-
-  async function loadExams() {
-    try {
-      const res = await api.get("/api/exams/");
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data?.results || [];
-      setExams(data);
-    } catch (err) {
-      console.error("Failed to load exams:", err);
-    }
-  }
 
   useEffect(() => {
-    loadSections();
-    loadSubjects();
-    loadTeachers();
-    loadExams();
-  }, []);
+    let cancelled = false;
+
+    async function load() {
+      setLoadingData(true);
+      setError("");
+      try {
+        const [sectionRes, subjectRes, teacherRes] = await Promise.allSettled([
+          api.get("/api/academics/sections/"),
+          api.get("/api/academics/subjects/"),
+          api.get("/api/teachers/"),
+        ]);
+
+        if (cancelled) return;
+
+        if (sectionRes.status === "fulfilled") {
+          const data = sectionRes.value.data;
+          setSections(Array.isArray(data) ? data : data?.results || []);
+        }
+        if (subjectRes.status === "fulfilled") {
+          const data = subjectRes.value.data;
+          setSubjects(Array.isArray(data) ? data : data?.results || []);
+        }
+        if (teacherRes.status === "fulfilled") {
+          const data = teacherRes.value.data;
+          setTeachers(Array.isArray(data) ? data : data?.results || []);
+        }
+
+        if (homeworkId) {
+          const res = await api.get(`/api/homework/${homeworkId}/`);
+          if (cancelled) return;
+          setHomework({
+            title: res.data.title ?? "",
+            description: res.data.description ?? "",
+            section: res.data.section ?? "",
+            subject: res.data.subject ?? "",
+            due_date: res.data.due_date ?? "",
+            teacher: res.data.teacher ?? "",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load homework data:", err);
+        if (!cancelled) {
+          setError(
+            err.response?.data?.detail ||
+              err.response?.data?.message ||
+              "Unable to load the form. Please try again."
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingData(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [homeworkId]);
 
   const handleSave = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    try {
-      const payload = {
-        title: homework.title,
-        description: homework.description,
-        section: homework.section,
-        subject: homework.subject,
-        due_date: homework.due_date,
-        teacher: user.teacher_profile?.id || null,
-      };
+    const payload = {
+      title: homework.title,
+      description: homework.description,
+      section: homework.section,
+      subject: homework.subject,
+      due_date: homework.due_date,
+    };
 
-      if (examId) {
-        await api.post(`/api/exams/exams/${examId}/homework/`, payload);
+    // Admin picks the owning teacher; a teacher's own profile is set server-side.
+    if (canManage) {
+      payload.teacher = homework.teacher || null;
+    }
+
+    try {
+      if (editing) {
+        await api.patch(`/api/homework/${homeworkId}/`, payload);
       } else {
         await api.post("/api/homework/", payload);
       }
 
       setSuccess(true);
-      setLoading(false);
+      navigate("/admin/homework");
     } catch (err) {
-      console.error("Failed to create homework:", err);
+      console.error("Failed to save homework:", err);
       setError(
-        err.response?.data?.detail ||
-        err.response?.data?.message ||
-        "Failed to create homework. Please try again."
+        flattenErrors(
+          err.response?.data,
+          "Failed to save homework. Please try again."
+        )
       );
       setLoading(false);
     }
@@ -127,7 +146,9 @@ export default function HomeworkCreate() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Create Homework</h1>
+        <h1 className="text-2xl font-semibold">
+          {editing ? "Edit Homework" : "Create Homework"}
+        </h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
           Assign homework to a class/section and subject.
         </p>
@@ -141,11 +162,14 @@ export default function HomeworkCreate() {
 
       {success && (
         <div className="rounded-lg border border-green-500 bg-green-50 dark:bg-green-950/40 dark:border-green-500 px-4 py-3 text-sm text-green-700 dark:text-green-400">
-          <Eye size={12} /> Homework created successfully.
+          Homework saved successfully.
         </div>
       )}
 
       <Card>
+        {loadingData && (
+          <p className="text-sm text-slate-500 mb-3">Loading form data…</p>
+        )}
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Title</label>
@@ -153,7 +177,7 @@ export default function HomeworkCreate() {
               type="text"
               value={homework.title}
               onChange={(e) =>
-                setHomework({ ...homework, title: e.target.value.trim() })}
+                setHomework({ ...homework, title: e.target.value })}
               required
               className="w-full rounded border p-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
               placeholder="e.g., Chapter 1 Exercises"
@@ -165,7 +189,7 @@ export default function HomeworkCreate() {
             <textarea
               value={homework.description}
               onChange={(e) =>
-                setHomework({ ...homework, description: e.target.value.trim() })}
+                setHomework({ ...homework, description: e.target.value })}
               rows={2}
               className="w-full rounded border p-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
               placeholder="e.g., Exercises 1-10"
@@ -179,12 +203,13 @@ export default function HomeworkCreate() {
                 value={homework.section}
                 onChange={(e) =>
                   setHomework({ ...homework, section: e.target.value })}
+                required
                 className="w-full rounded border p-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">Select section</option>
                 {sections.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.class_room?.name || s.name} - {s.name}
+                    {s.class_room_name ? `${s.class_room_name} - ${s.name}` : s.name}
                   </option>
                 ))}
               </select>
@@ -196,6 +221,7 @@ export default function HomeworkCreate() {
                 value={homework.subject}
                 onChange={(e) =>
                   setHomework({ ...homework, subject: e.target.value })}
+                required
                 className="w-full rounded border p-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">Select subject</option>
@@ -222,43 +248,42 @@ export default function HomeworkCreate() {
 
           {canManage && (
             <div>
-              <label className="block text-sm font-medium mb-1">Teacher (Admin only)</label>
+              <label className="block text-sm font-medium mb-1">Teacher</label>
               <select
-                value={homework.teacher || ""}
+                value={homework.teacher}
                 onChange={(e) =>
                   setHomework({ ...homework, teacher: e.target.value })}
+                required
                 className="w-full rounded border p-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">Select teacher</option>
                 {teachers.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.full_name || t.employee_id} ({t.employee_id})
+                    {t.full_name || t.employee_id}
                   </option>
                 ))}
               </select>
             </div>
-            )}
-            
-            {examId && (
-              <p className="text-xs text-slate-500 mt-2">
-                Homework assigned for exam: {exams.find((e) => e.id == examId)?.name || "Unknown exam"}
-              </p>
-            )}
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <button
               type="button"
-              onClick={() => window.history.back()}
+              onClick={() => navigate("/admin/homework")}
               className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || loadingData}
               className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50"
             >
-              {loading ? "Saving..." : "Create Homework"}
+              {loading
+                ? "Saving..."
+                : editing
+                ? "Update Homework"
+                : "Create Homework"}
             </button>
           </div>
         </form>

@@ -4,7 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard, Users, GraduationCap, CalendarCheck, BookOpen,
   Wallet, Megaphone, Moon, Sun, LogOut, Menu, X, MessageSquare,
-  Calendar, Briefcase, UserCheck, History,
+  Calendar, Briefcase, History, FolderOpen, Layout,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -26,7 +26,6 @@ const NAV_BY_ROLE = {
     { to: '/admin/timetable', label: 'Timetable', icon: Layout },
     { to: '/admin/fee-structures', label: 'Fee Structures', icon: Wallet },
     { to: '/admin/fee-payments', label: 'Fee Payments', icon: History },
-    { to: '/admin/teacher-salaries', label: 'Teacher Salaries', icon: UserCheck },
     { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
     { to: '/admin/whatsapp', label: 'WhatsApp & Alerts', icon: MessageSquare },
   ],
@@ -47,7 +46,6 @@ const NAV_BY_ROLE = {
     { to: '/admin/timetable', label: 'Timetable', icon: Layout },
     { to: '/admin/fee-structures', label: 'Fee Structures', icon: Wallet },
     { to: '/admin/fee-payments', label: 'Fee Payments', icon: History },
-    { to: '/admin/teacher-salaries', label: 'Teacher Salaries', icon: UserCheck },
     { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
     { to: '/admin/whatsapp', label: 'WhatsApp & Alerts', icon: MessageSquare },
   ],

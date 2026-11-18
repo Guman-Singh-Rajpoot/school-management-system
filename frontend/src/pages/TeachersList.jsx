@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import Card from '../components/Card';
 import DataTable from '../components/DataTable';
@@ -23,6 +24,7 @@ const DOC_TYPES = [
 ];
 
 export default function TeachersList() {
+  const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

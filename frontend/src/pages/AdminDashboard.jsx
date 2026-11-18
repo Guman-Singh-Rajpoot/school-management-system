@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/client";
 import StatCard from "../components/StatCard";
 import Card from "../components/Card";
-import { Users, GraduationCap, CalendarCheck, Wallet, Calendar, BookOpen, Megaphone, MessageSquare } from "lucide-react";
+import { Users, GraduationCap, CalendarCheck, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function AdminDashboard() {
@@ -18,13 +18,6 @@ export default function AdminDashboard() {
   });
 
   const [todayAttendance, setTodayAttendance] = useState(null);
-
-  const [salaryStats, setSalaryStats] = useState({
-    totalDue: 0,
-    totalPaid: 0,
-  });
-
-  const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,16 +29,12 @@ export default function AdminDashboard() {
           api.get("/teachers/?page_size=1"),
           api.get("/fees/student-fees/dashboard_summary/"),
           api.get("/attendance/summary/", { params: { date: today } }),
-          api.get("/teachers/salaries/"),
-          api.get("/api/exams/"),
         ]);
 
         const studentsRes = results[0];
         const teachersRes = results[1];
         const feesRes = results[2];
         const attendanceRes = results[3];
-        const salariesRes = results[4];
-        const examsRes = results[5];
 
         setStats({
           students:
@@ -73,23 +62,6 @@ export default function AdminDashboard() {
           setTodayAttendance(attendanceRes.value.data);
         }
 
-        if (salariesRes.status === "fulfilled") {
-          const list = salariesRes.value.data?.results || (Array.isArray(salariesRes.value.data) ? salariesRes.value.data : []);
-          let due = 0;
-          let paid = 0;
-          list.forEach((s) => {
-            due += Number(s.amount || 0);
-            paid += Number(s.paid_amount || 0);
-          });
-          setSalaryStats({ totalDue: due, totalPaid: paid });
-        }
-
-        if (examsRes.status === "fulfilled") {
-          const data = Array.isArray(examsRes.data)
-            ? examsRes.data
-            : examsRes.data?.results || [];
-          setExams(data);
-        }
       } catch (error) {
         console.error("Dashboard error:", error);
       } finally {
@@ -214,14 +186,14 @@ export default function AdminDashboard() {
           </Link>
 
           <Link
-            to "/admin/examinations"
+            to="/admin/examinations"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
             Examinations
           </Link>
 
           <Link
-            to "/admin/marks"
+            to="/admin/marks"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
             Marks
@@ -235,21 +207,21 @@ export default function AdminDashboard() {
           </Link>
 
           <Link
-            to "/admin/documents"
+            to="/admin/documents"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
             Documents
           </Link>
 
           <Link
-            to "/admin/homework"
+            to="/admin/homework"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
             Homework
           </Link>
 
           <Link
-            to "/admin/timetable"
+            to="/admin/timetable"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
             Timetable
@@ -270,7 +242,7 @@ export default function AdminDashboard() {
           </Link>
 
           <Link
-            to="/admin/teacher-salaries"
+            to="/admin/salaries"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 font-medium"
           >
             Teacher Salaries
@@ -284,7 +256,7 @@ export default function AdminDashboard() {
           </Link>
 
           <Link
-            to "/admin/whatsapp"
+            to="/admin/whatsapp"
             className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 font-medium"
           >
             WhatsApp & Alerts

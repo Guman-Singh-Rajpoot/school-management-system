@@ -1,37 +1,41 @@
 import { useEffect, useState } from "react";
-import { useParams, useReactive } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
-import { Plus, Eye, Trash, Calendar, GraduationCap } from "lucide-react";
-import Modal from "../components/Modal";
-import MarkCreate from "./MarkCreate";
-import ReportCard from "./ReportCard";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 
 export default function MarksList() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const examFilter = searchParams.get("exam") || "";
+  const studentFilter = searchParams.get("student") || "";
+
   const [marks, setMarks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [examFilter, setExamFilter] = useState("");
-  const [studentFilter, setStudentFilter] = useState("");
 
-  const canManage =
-    ["ADMIN", "OWNER"].includes(String(user?.role || "").toUpperCase());
+  const canManage = ["ADMIN", "OWNER", "TEACHER"].includes(
+    String(user?.role || "").toUpperCase()
+  );
+
+  function updateFilters(next) {
+    const merged = { exam: examFilter, student: studentFilter, ...next };
+    const params = new URLSearchParams();
+    if (merged.exam) params.set("exam", merged.exam);
+    if (merged.student) params.set("student", merged.student);
+    setSearchParams(params, { replace: true });
+  }
 
   async function load() {
     try {
       setLoading(true);
       setError("");
-      let url = "/api/exams/marks/";
-      const params = new URLSearchParams();
-      if (examFilter) params.append("exam_subject", examFilter);
-      if (studentFilter) params.append("student", studentFilter);
-      if (params.toString()) {
-        url += "?" + params.toString();
-      }
-      const res = await api.get(url);
+      const params = {};
+      if (examFilter) params["exam_subject__exam"] = examFilter;
+      if (studentFilter) params["student"] = studentFilter;
+      const res = await api.get("/api/exams/marks/", { params });
       const data = Array.isArray(res.data)
         ? res.data
         : res.data?.results || [];
@@ -40,8 +44,8 @@ export default function MarksList() {
       console.error("Failed to load marks:", err);
       setError(
         err.response?.data?.detail ||
-        err.response?.data?.message ||
-        "Unable to load marks. Please try again."
+          err.response?.data?.message ||
+          "Unable to load marks. Please try again."
       );
     } finally {
       setLoading(false);
@@ -55,50 +59,63 @@ export default function MarksList() {
     return () => clearTimeout(timeout);
   }, [examFilter, studentFilter]);
 
-  // Load available exams and students for filters
   const [exams, setExams] = useState([]);
   const [students, setStudents] = useState([]);
 
   useEffect(() => {
     async function loadOptions() {
-      try {
-        const [examRes, studentRes] = await Promise.allSettled([
-          api.get("/api/exams/exams/"),
-          api.get("/api/students/", { params: { page_size: 100 } }),
-        ]);
-        if (examRes.status === "fulfilled") {
-          const data = Array.isArray(examRes.data)
-            ? examRes.data
-            : examRes.data?.results || [];
-          setExams(data);
-        }
-        if (studentRes.status === "fulfilled") {
-          const data = Array.isArray(studentRes.data)
-            ? studentRes.data
-            : studentRes.data?.results || [];
-          setStudents(data);
-        }
-      } catch (err) {
-        console.error("Failed to load options:", err);
+      const [examRes, studentRes] = await Promise.allSettled([
+        api.get("/api/exams/exams/"),
+        api.get("/api/students/", { params: { page_size: 100 } }),
+      ]);
+      if (examRes.status === "fulfilled") {
+        const data = Array.isArray(examRes.value.data)
+          ? examRes.value.data
+          : examRes.value.data?.results || [];
+        setExams(data);
+      }
+      if (studentRes.status === "fulfilled") {
+        const data = Array.isArray(studentRes.value.data)
+          ? studentRes.value.data
+          : studentRes.value.data?.results || [];
+        setStudents(data);
       }
     }
     loadOptions();
   }, []);
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this mark?")) {
+      return;
+    }
+    try {
+      await api.delete(`/api/exams/marks/${id}/`);
+      await load();
+    } catch (err) {
+      console.error("Failed to delete mark:", err);
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.message ||
+          "Unable to delete the mark."
+      );
+    }
+  };
+
   const columns = [
     {
       key: "student_name",
       header: "Student",
-      render: (row) => row.student_name || `${row.student?.first_name || ''} ${row.student?.last_name || ''}`.trim() || row.student?.admission_number || "-",
+      render: (row) => row.student_name || "-",
     },
     {
       key: "subject_name",
       header: "Subject",
+      render: (row) => row.subject_name || "-",
     },
     {
-      key: "exam_subject_name",
+      key: "exam_name",
       header: "Exam",
-      render: (row) => row.exam_subject_name || "-",
+      render: (row) => row.exam_name || "-",
     },
     {
       key: "marks_obtained",
@@ -112,42 +129,38 @@ export default function MarksList() {
       key: "percentage",
       header: "Percentage",
       render: (row) => {
-        const percentage = row.marks_obtained && row.max_marks
-          ? ((Number(row.marks_obtained) / Number(row.max_marks)) * 100).toFixed(2)
-          : "-";
-        return `${percentage}%`;
+        const percentage =
+          row.marks_obtained && row.max_marks
+            ? ((Number(row.marks_obtained) / Number(row.max_marks)) * 100).toFixed(2)
+            : null;
+        return percentage ? `${percentage}%` : "-";
       },
     },
     {
       key: "actions",
       header: "Actions",
       render: (row) => {
-        const buttons = [];
+        if (!canManage) return null;
 
-        if (canManage) {
-          buttons.push(
+        return (
+          <div className="flex items-center gap-1">
             <Link
-              key="view"
-              to "/admin/marks/" + row.id
-              className="mr-2 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-sm text-brand-600"
-              title="View mark"
-            >
-              <Eye size={16} />
-            </Link>
-          );
-          buttons.push(
-            <Link
-              key="edit"
-              to "/admin/marks/create/" + row.id
-              className="ml-2 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-red-600"
+              to={`/admin/marks/${row.id}/edit`}
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-brand-600"
               title="Edit mark"
             >
-              <Trash size={16} />
+              <Pencil size={16} />
             </Link>
-          );
-        }
-
-        return <div className="flex items-center gap-1">{buttons}</div>;
+            <button
+              type="button"
+              onClick={() => handleDelete(row.id)}
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-red-600"
+              title="Delete mark"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        );
       },
     },
   ];
@@ -161,7 +174,6 @@ export default function MarksList() {
         </p>
       </div>
 
-      {/* API Error */}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/40 dark:border-red-900 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {error}
@@ -169,21 +181,13 @@ export default function MarksList() {
       )}
 
       <Card>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="text-lg font-medium">Student Marks</h2>
-          {canManage && (
-            <Link
-              to="/admin/marks/create"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium"
-            >
-              <Plus size={16} /> Enter Marks
-            </Link>
-          )}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={examFilter}
-              onChange={(e) => setExamFilter(e.target.value)}
-              className="rounded border p-1 w-32 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              onChange={(e) => updateFilters({ exam: e.target.value })}
+              className="rounded border p-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               <option value="">All Exams</option>
               {exams.map((exam) => (
@@ -195,8 +199,8 @@ export default function MarksList() {
 
             <select
               value={studentFilter}
-              onChange={(e) => setStudentFilter(e.target.value)}
-              className="rounded border p-1 w-32 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              onChange={(e) => updateFilters({ student: e.target.value })}
+              className="rounded border p-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               <option value="">All Students</option>
               {students.map((student) => (
@@ -205,6 +209,19 @@ export default function MarksList() {
                 </option>
               ))}
             </select>
+
+            {canManage && (
+              <Link
+                to={
+                  examFilter
+                    ? `/admin/marks/create?exam=${examFilter}`
+                    : "/admin/marks/create"
+                }
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium"
+              >
+                <Plus size={16} /> Enter Marks
+              </Link>
+            )}
           </div>
         </div>
 
@@ -214,23 +231,11 @@ export default function MarksList() {
           loading={loading}
           emptyText={
             canManage
-              ? "No marks found. Enter marks using the form above."
+              ? "No marks found. Enter marks using the button above."
               : "No marks visible."
           }
         />
       </Card>
-
-      {/* Marks Enter Form - visible to Admin/Owner */}
-      {canManage && (
-        <Modal
-          open={false}
-          onClose={() => {}}
-          title="Enter Marks"
-          wide
-        >
-          <MarkCreate onCancel={() => {}} onCreated={() => load()} />
-        </Modal>
-      )}
 
       <Card title="Results Overview">
         <p className="text-sm text-slate-500">

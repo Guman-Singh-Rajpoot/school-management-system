@@ -1,40 +1,45 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
-import { Plus, Eye, Trash, Calendar, Users } from "lucide-react";
-import Modal from "../components/Modal";
-import { useRouter } from "react-router-dom";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 
 export default function HomeworkList() {
   const { user } = useAuth();
-  const router = useRouter();
-  const classId = router.query.classId || null;
-  const sectionId = router.query.sectionId || null;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const classFilter = searchParams.get("class") || "";
+  const sectionFilter = searchParams.get("section") || "";
 
   const [homework, setHomework] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const canManage =
-    ["ADMIN", "OWNER"].includes(String(user?.role || "").toUpperCase());
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
 
-  const isTeacher = ["TEACHER"].includes(String(user?.role || "").toUpperCase());
-  const isStudent = ["STUDENT"].includes(String(user?.role || "").toUpperCase());
+  const role = String(user?.role || "").toUpperCase();
+  const canManage = ["ADMIN", "OWNER", "TEACHER"].includes(role);
+  const isTeacher = role === "TEACHER";
+  const isStudent = role === "STUDENT";
+
+  function updateFilters(next) {
+    const merged = { class: classFilter, section: sectionFilter, ...next };
+    const params = new URLSearchParams();
+    if (merged.class) params.set("class", merged.class);
+    if (merged.section) params.set("section", merged.section);
+    setSearchParams(params, { replace: true });
+  }
 
   async function load() {
     try {
       setLoading(true);
       setError("");
-      let url = "/api/homework/";
-      const params = new URLSearchParams();
-
-      if (classId) params.append("section", classId);
-      if (sectionId) params.append("section", sectionId);
-
-      const res = await api.get(url, { params });
+      const params = {};
+      if (sectionFilter) params["section"] = sectionFilter;
+      else if (classFilter) params["section__class_room"] = classFilter;
+      const res = await api.get("/api/homework/", { params });
       const data = Array.isArray(res.data)
         ? res.data
         : res.data?.results || [];
@@ -43,8 +48,8 @@ export default function HomeworkList() {
       console.error("Failed to load homework:", err);
       setError(
         err.response?.data?.detail ||
-        err.response?.data?.message ||
-        "Unable to load homework. Please try again."
+          err.response?.data?.message ||
+          "Unable to load homework. Please try again."
       );
     } finally {
       setLoading(false);
@@ -56,7 +61,46 @@ export default function HomeworkList() {
       load();
     }, 300);
     return () => clearTimeout(timeout);
-  }, [classId, sectionId]);
+  }, [classFilter, sectionFilter]);
+
+  useEffect(() => {
+    async function loadOptions() {
+      const [classRes, sectionRes] = await Promise.allSettled([
+        api.get("/api/academics/classes/"),
+        api.get("/api/academics/sections/"),
+      ]);
+      if (classRes.status === "fulfilled") {
+        const data = classRes.value.data;
+        setClasses(Array.isArray(data) ? data : data?.results || []);
+      }
+      if (sectionRes.status === "fulfilled") {
+        const data = sectionRes.value.data;
+        setSections(Array.isArray(data) ? data : data?.results || []);
+      }
+    }
+    loadOptions();
+  }, []);
+
+  const visibleSections = sections.filter(
+    (s) => !classFilter || String(s.class_room) === String(classFilter)
+  );
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this homework?")) {
+      return;
+    }
+    try {
+      await api.delete(`/api/homework/${id}/`);
+      await load();
+    } catch (err) {
+      console.error("Failed to delete homework:", err);
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.message ||
+          "Unable to delete the homework."
+      );
+    }
+  };
 
   const columns = [
     {
@@ -66,12 +110,12 @@ export default function HomeworkList() {
     {
       key: "subject_name",
       header: "Subject",
+      render: (row) => row.subject_name || "-",
     },
     {
       key: "section",
       header: "Class/Section",
-      render: (row) =>
-        row.section_name || row.section?.name || "-",
+      render: (row) => row.section_name || "-",
     },
     {
       key: "due_date",
@@ -87,66 +131,27 @@ export default function HomeworkList() {
       key: "actions",
       header: "Actions",
       render: (row) => {
-        const buttons = [];
+        if (!canManage) return null;
 
-        if (canManage) {
-          buttons.push(
+        return (
+          <div className="flex items-center gap-1">
             <Link
-              key="view"
-              to "/admin/homework/" + row.id
-              className="mr-1 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-brand-600"
-              title="View homework"
-            >
-              <Eye size={16} />
-            </Link>
-          );
-          buttons.push(
-            <Link
-              key="edit"
-              to `/admin/homework/create/${row.id}`
-              className="ml-1 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-red-600"
+              to={`/admin/homework/${row.id}/edit`}
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-brand-600"
               title="Edit homework"
             >
-              <Trash size={16} />
+              <Pencil size={16} />
             </Link>
-          );
-        }
-
-        if (isTeacher) {
-          // Teachers can view their own homework
-          if (row.teacher && row.teacher.user === user) {
-            buttons.push(
-              <Link
-                key="edit"
-                to "/admin/homework/" + row.id
-                className="ml-1 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-brand-600"
-                title="View/Edit"
-              >
-                <Eye size={16} />
-              </Link>
-            );
-          }
-        }
-
-        if (isStudent) {
-          // Students can view homework for their class/section
-          const rowSection = row.section?.id;
-          const userSection = user.student_profile?.section?.id;
-          if (rowSection === userSection) {
-            buttons.push(
-              <Link
-                key="submit"
-                to "/student/homework/" + row.id
-                className="ml-1 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-green-600"
-                title="Submit"
-              >
-                <Plus size={16} />
-              </Link>
-            );
-          }
-        }
-
-        return <div className="flex items-center gap-1">{buttons}</div>;
+            <button
+              type="button"
+              onClick={() => handleDelete(row.id)}
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-red-600"
+              title="Delete homework"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        );
       },
     },
   ];
@@ -160,7 +165,6 @@ export default function HomeworkList() {
         </p>
       </div>
 
-      {/* API Error */}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/40 dark:border-red-900 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {error}
@@ -168,13 +172,55 @@ export default function HomeworkList() {
       )}
 
       <Card>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-lg font-medium">Homework</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={classFilter}
+              onChange={(e) =>
+                updateFilters({ class: e.target.value, section: "" })
+              }
+              className="rounded border p-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">All Classes</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={sectionFilter}
+              onChange={(e) => updateFilters({ section: e.target.value })}
+              className="rounded border p-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">All Sections</option>
+              {visibleSections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.class_room_name ? `${s.class_room_name} - ${s.name}` : s.name}
+                </option>
+              ))}
+            </select>
+
+            {canManage && (
+              <Link
+                to="/admin/homework/create"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium"
+              >
+                <Plus size={16} /> Create Homework
+              </Link>
+            )}
+          </div>
+        </div>
+
         <DataTable
           columns={columns}
           rows={homework}
           loading={loading}
           emptyText={
             canManage
-              ? "No homework found. Create new homework using the form below."
+              ? "No homework found. Create one to get started."
               : isTeacher
               ? "No homework assigned to your classes yet."
               : isStudent
@@ -184,69 +230,10 @@ export default function HomeworkList() {
         />
       </Card>
 
-      {/* Create homework form for Admin/Owner/Teacher */}
-      {canManage && (
-        <Modal
-          open={false}
-          onClose={() => {}}
-          title="Create Homework"
-          wide
-        >
-          <div className="grid grid-cols-2 gap-4">
-            <select
-              className="rounded border p-2 w-full focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">Select class</option>
-              {/* Classes would be populated */}
-            </select>
-
-            <select
-              className="rounded border p-2 w-full focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">Select section</option>
-            </select>
-          </div>
-
-          <select
-            className="rounded border p-2 w-full focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="">Select subject</option>
-          </select>
-
-          <input
-            type="text"
-            placeholder="Homework title"
-            className="rounded border p-2 w-full focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-          <input
-            type="text"
-            placeholder="Description"
-            className="rounded border p-2 w-full focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-          <input
-            type="date"
-            className="rounded border p-2 w-full focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-          <select
-            className="rounded border p-2 w-full focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="">Due date option</option>
-          </select>
-
-          <div className="mt-4">
-            <button
-              className="rounded bg-brand-600 px-4 py-2 text-white font-medium hover:bg-brand-700 transition"
-            >
-              Create Homework
-            </button>
-          </div>
-        </Modal>
-      )}
-
       <Card title="Access Notes">
         <p className="text-xs text-slate-500">
-          ADMIN/Owner: manage all homework. Teachers: view homework for assigned classes.
-          Students: view homework for their class and submit submissions.
+          ADMIN/Owner: manage all homework. Teachers: manage homework for their
+          assigned classes. Students: view homework for their class and section.
         </p>
       </Card>
     </div>

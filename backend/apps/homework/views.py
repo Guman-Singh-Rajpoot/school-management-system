@@ -7,7 +7,7 @@ from .serializers import HomeworkSerializer, HomeworkSubmissionSerializer
 class HomeworkViewSet(viewsets.ModelViewSet):
     queryset = Homework.objects.select_related('subject', 'teacher__user', 'section').all()
     serializer_class = HomeworkSerializer
-    filterset_fields = ['section', 'subject', 'teacher']
+    filterset_fields = ['section', 'subject', 'teacher', 'section__class_room']
 
     def get_queryset(self):
         qs = super().get_queryset()

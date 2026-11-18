@@ -13,6 +13,8 @@ class ExamSubjectSerializer(serializers.ModelSerializer):
 
 class ExamSerializer(serializers.ModelSerializer):
     exam_subjects = ExamSubjectSerializer(many=True, read_only=True)
+    school_class_name = serializers.CharField(source='school_class.name', read_only=True)
+    session_name = serializers.CharField(source='session.name', read_only=True)
 
     class Meta:
         model = Exam
@@ -29,6 +31,11 @@ class MarkSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
     subject_name = serializers.CharField(source='exam_subject.subject.name', read_only=True)
     max_marks = serializers.IntegerField(source='exam_subject.max_marks', read_only=True)
+    exam_name = serializers.CharField(source='exam_subject.exam.name', read_only=True)
+    grade_name = serializers.SerializerMethodField()
+
+    def get_grade_name(self, obj):
+        return obj.grade.name if obj.grade else None
 
     class Meta:
         model = Mark

@@ -1,3 +1,4 @@
+
 """
 Django settings for the Student & Teacher Management System.
 """
@@ -25,7 +26,7 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
-    default="school-management-system-8lht.onrender.com,localhost,127.0.0.1,[::1]",
+    default="localhost,127.0.0.1,[::1]",
     cast=Csv(),
 )
 
@@ -73,6 +74,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -119,12 +121,16 @@ if DATABASE_URL:
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=600,
+            ssl_require=not DEBUG,
         )
     }
 else:
     DATABASES = {
         "default": {
-            "ENGINE": config("DB_ENGINE", default="django.db.backends.postgresql"),
+            "ENGINE": config(
+                "DB_ENGINE",
+                default="django.db.backends.postgresql",
+            ),
             "NAME": config("DB_NAME", default="school_management"),
             "USER": config("DB_USER", default="postgres"),
             "PASSWORD": config("DB_PASSWORD", default=""),
@@ -183,11 +189,20 @@ USE_TZ = True
 # Static / Media
 # ---------------------------------------------------------------------------
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +286,7 @@ SPECTACULAR_SETTINGS = {
 # ---------------------------------------------------------------------------
 
 _cors_env = config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
+
 _default_cors = [
     "https://school-management-system-theta-sepia.vercel.app",
 
@@ -280,8 +296,13 @@ _default_cors = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(
-    _default_cors + [origin.strip() for origin in _cors_env if origin.strip()]
+    _default_cors + [
+        origin.strip()
+        for origin in _cors_env
+        if origin.strip()
+    ]
 ))
 
 CORS_ALLOW_CREDENTIALS = True
@@ -297,9 +318,9 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 # ---------------------------------------------------------------------------
 
 _csrf_env = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
+
 _default_csrf = [
     "https://school-management-system-theta-sepia.vercel.app",
-    "https://school-management-system-8lht.onrender.com",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
@@ -307,8 +328,13 @@ _default_csrf = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 ]
+
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(
-    _default_csrf + [origin.strip() for origin in _csrf_env if origin.strip()]
+    _default_csrf + [
+        origin.strip()
+        for origin in _csrf_env
+        if origin.strip()
+    ]
 ))
 
 
@@ -316,9 +342,15 @@ CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(
 # Security Hardening
 # ---------------------------------------------------------------------------
 
-SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # ---------------------------------------------------------------------------
@@ -327,14 +359,22 @@ X_FRAME_OPTIONS = "DENY"
 
 EMAIL_BACKEND = config(
     "EMAIL_BACKEND",
-    default="django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend",
+    default=(
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    ),
 )
+
 EMAIL_HOST = config("EMAIL_HOST", default="localhost")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@schoolmanagement.local")
+DEFAULT_FROM_EMAIL = config(
+    "DEFAULT_FROM_EMAIL",
+    default="noreply@schoolmanagement.local",
+)
 
 FRONTEND_URL = config(
     "FRONTEND_URL",
@@ -345,8 +385,6 @@ FRONTEND_URL = config(
 # ---------------------------------------------------------------------------
 # WhatsApp Business Cloud API (optional)
 # ---------------------------------------------------------------------------
-# Set these in .env to enable WhatsApp notifications.
-# Without them the app continues working; notifications are logged as NOT_CONFIGURED.
 
 WHATSAPP_ACCESS_TOKEN = config("WHATSAPP_ACCESS_TOKEN", default="")
 WHATSAPP_PHONE_NUMBER_ID = config("WHATSAPP_PHONE_NUMBER_ID", default="")

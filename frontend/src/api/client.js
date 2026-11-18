@@ -7,24 +7,33 @@ import axios from "axios";
 |--------------------------------------------------------------------------
 | All API requests go through this instance.
 |
-| React:
+| Both formats are supported:
 |   api.get("/students/")
+|   api.get("/api/students/")
 |
-| Django:
+| Both will reach Django as:
 |   /api/students/
 |--------------------------------------------------------------------------
 */
 
 function getBaseURL() {
   const envUrl = import.meta.env.VITE_API_URL;
+
   if (typeof envUrl === "string" && envUrl.trim().length > 0) {
-    return envUrl.trim().replace(/\/+$/, "");
+    // Remove trailing slashes and an optional /api suffix.
+    return envUrl
+      .trim()
+      .replace(/\/+$/, "")
+      .replace(/\/api$/i, "");
   }
-  // In development, default to "/api" which Vite proxies to http://127.0.0.1:8000
+
+  // In development, Vite proxies /api to Django.
   if (import.meta.env.DEV) {
-    return "/api";
+    return "";
   }
-   return "http://localhost:8000/api";
+
+  // Production fallback: deployed Render backend.
+  return "https://school-management-system-backend-13fd.onrender.com";
 }
 
 const api = axios.create({
@@ -38,14 +47,24 @@ const api = axios.create({
 |--------------------------------------------------------------------------
 | REQUEST INTERCEPTOR
 |--------------------------------------------------------------------------
-| Automatically attach JWT access token for authenticated endpoints.
-| Omit for login, refresh, register, and health checks to avoid sending
-| expired tokens that cause 401s on unauthenticated views.
+| Normalize API paths so every relative request has exactly one /api prefix.
+| Attach the JWT access token to protected endpoints.
 |--------------------------------------------------------------------------
 */
 
 api.interceptors.request.use(
   (config) => {
+    if (config.url && !/^https?:\/\//i.test(config.url)) {
+      const path = config.url.startsWith("/")
+        ? config.url
+        : `/${config.url}`;
+
+      config.url =
+        path === "/api" || path.startsWith("/api/")
+          ? path
+          : `/api${path}`;
+    }
+
     const accessToken = localStorage.getItem("access_token");
 
     const isPublicEndpoint =
@@ -98,23 +117,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Server not reachable
-    |--------------------------------------------------------------------------
-    */
-
+    // Server not reachable
     if (!error.response) {
       console.error("API server is not reachable.");
       return Promise.reject(error);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Only handle 401
-    |--------------------------------------------------------------------------
-    */
-
+    // Only handle 401 responses.
     if (
       error.response.status !== 401 ||
       !originalRequest ||
@@ -123,12 +132,7 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Don't refresh the login/refresh endpoint itself
-    |--------------------------------------------------------------------------
-    */
-
+    // Do not refresh login or refresh requests themselves.
     if (
       originalRequest.url?.includes("/auth/login/") ||
       originalRequest.url?.includes("/auth/token/") ||
@@ -142,12 +146,7 @@ api.interceptors.response.use(
 
     const refreshToken = localStorage.getItem("refresh_token");
 
-    /*
-    |--------------------------------------------------------------------------
-    | No refresh token
-    |--------------------------------------------------------------------------
-    */
-
+    // No refresh token available.
     if (!refreshToken) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
@@ -158,12 +157,7 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | If another request is refreshing, wait
-    |--------------------------------------------------------------------------
-    */
-
+    // Wait if another request is already refreshing the token.
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
         failedQueue.push({
@@ -178,21 +172,10 @@ api.interceptors.response.use(
       });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Start refresh
-    |--------------------------------------------------------------------------
-    */
-
+    // Start token refresh.
     isRefreshing = true;
 
     try {
-      /*
-      IMPORTANT:
-      Use the same Axios instance so the request goes through
-      the Vite -> Django /api proxy.
-      */
-
       const response = await api.post("/auth/refresh/", {
         refresh: refreshToken,
       });
@@ -205,43 +188,20 @@ api.interceptors.response.use(
         );
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Save new access token
-      |--------------------------------------------------------------------------
-      */
+      // Save the new access token.
+      localStorage.setItem("access_token", newAccessToken);
 
-      localStorage.setItem(
-        "access_token",
-        newAccessToken
-      );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Resolve queued requests
-      |--------------------------------------------------------------------------
-      */
-
+      // Retry queued requests.
       processQueue(null, newAccessToken);
 
-      /*
-      |--------------------------------------------------------------------------
-      | Retry original request
-      |--------------------------------------------------------------------------
-      */
-
+      // Retry the original request.
       originalRequest.headers = originalRequest.headers || {};
-
-      originalRequest.headers.Authorization =
-        `Bearer ${newAccessToken}`;
+      originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
       return api(originalRequest);
 
     } catch (refreshError) {
-      console.error(
-        "Token refresh failed:",
-        refreshError
-      );
+      console.error("Token refresh failed:", refreshError);
 
       processQueue(refreshError, null);
 
@@ -259,6 +219,12 @@ api.interceptors.response.use(
   }
 );
 
+/*
+|--------------------------------------------------------------------------
+| BACKEND HEALTH CHECK
+|--------------------------------------------------------------------------
+*/
+
 export async function checkBackendHealth() {
   try {
     const response = await api.get("/health/");
@@ -272,4 +238,3 @@ export async function checkBackendHealth() {
 }
 
 export default api;
-
